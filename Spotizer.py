@@ -9,7 +9,7 @@ import re
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QLineEdit, 
                             QPushButton, QProgressBar, QFileDialog,
-                            QRadioButton)
+                            QRadioButton, QToolButton)
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap, QCursor
@@ -213,7 +213,7 @@ class SpotizerGUI(QMainWindow):
             self.setWindowIcon(QIcon(icon_path))
             
         self.setFixedWidth(600)
-        self.setFixedHeight(200)
+        self.setFixedHeight(180)
         
         self.default_music_dir = str(Path.home() / "Music")
         if not os.path.exists(self.default_music_dir):
@@ -244,10 +244,19 @@ class SpotizerGUI(QMainWindow):
         url_layout = QHBoxLayout()
         url_label = QLabel("Track URL:")
         url_label.setFixedWidth(100)
+        
         self.url_input = QLineEdit()
+        self.url_input.setPlaceholderText("Please enter track URL")
+        self.url_input.setClearButtonEnabled(True)
+        clear_button = self.url_input.findChild(QToolButton)
+        if clear_button:
+            clear_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.url_input.textChanged.connect(self.validate_url)
+        
         self.fetch_button = QPushButton("Fetch")
         self.fetch_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.fetch_button.setFixedWidth(100)
+        self.fetch_button.setEnabled(False)
         self.fetch_button.clicked.connect(self.fetch_track_info)
         url_layout.addWidget(url_label)
         url_layout.addWidget(self.url_input)
@@ -258,6 +267,7 @@ class SpotizerGUI(QMainWindow):
         arl_label = QLabel("ARL:")
         arl_label.setFixedWidth(100)
         self.arl_input = QLineEdit()
+        self.arl_input.setPlaceholderText("Please enter the ARL value or click Get ARL")
         self.get_arl_button = QPushButton("Get ARL")
         self.get_arl_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.get_arl_button.setFixedWidth(100)
@@ -389,6 +399,34 @@ class SpotizerGUI(QMainWindow):
         self.status_label = QLabel("")
         self.main_layout.addWidget(self.status_label)
 
+    def validate_url(self, url):
+        url = url.strip()
+        
+        self.fetch_button.setEnabled(False)
+        
+        if not url:
+            self.status_label.clear()
+            return
+                
+        if "open.spotify.com/" not in url:
+            self.status_label.setText("Please enter a valid Spotify URL")
+            return
+                
+        if "/album/" in url:
+            self.status_label.setText("Album URLs are not supported. Please enter a track URL.")
+            return
+                
+        if "/playlist/" in url:
+            self.status_label.setText("Playlist URLs are not supported. Please enter a track URL.")
+            return
+                
+        if "/track/" not in url:
+            self.status_label.setText("Please enter a valid Spotify track URL")
+            return
+                
+        self.fetch_button.setEnabled(True)
+        self.status_label.clear()
+    
     def fetch_track_info(self):
         url = self.url_input.text().strip()
         if not url:
@@ -415,9 +453,9 @@ class SpotizerGUI(QMainWindow):
         formatted_date = f"{date_parts[2]}-{date_parts[1]}-{date_parts[0]}"
         
         self.title_label.setText(f"{title}")
-        self.artist_label.setText(f"<b>{'Artists' if ',' in artists else 'Artist'}:</b> {artists}")
-        self.album_label.setText(f"<b>Album:</b> {album}")
-        self.release_date_label.setText(f"<b>Release Date:</b> {formatted_date}")
+        self.artist_label.setText(f"<b>{'Artists' if ',' in artists else 'Artist'}</b>    {artists}")
+        self.album_label.setText(f"<b>Album</b>    {album}")
+        self.release_date_label.setText(f"<b>Release Date</b>    {formatted_date}")
         
         image_url = info['cover']
         self.image_downloader = ImageDownloader(image_url)
