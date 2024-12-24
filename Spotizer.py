@@ -9,7 +9,7 @@ import re
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QLineEdit, 
                             QPushButton, QProgressBar, QFileDialog,
-                            QRadioButton, QToolButton)
+                            QRadioButton)
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap, QCursor
@@ -248,9 +248,6 @@ class SpotizerGUI(QMainWindow):
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("Please enter track URL")
         self.url_input.setClearButtonEnabled(True)
-        clear_button = self.url_input.findChild(QToolButton)
-        if clear_button:
-            clear_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.url_input.textChanged.connect(self.validate_url)
         
         self.fetch_button = QPushButton("Fetch")
@@ -268,6 +265,7 @@ class SpotizerGUI(QMainWindow):
         arl_label.setFixedWidth(100)
         self.arl_input = QLineEdit()
         self.arl_input.setPlaceholderText("Please enter the ARL value or click Get ARL")
+        self.arl_input.setClearButtonEnabled(True)
         self.get_arl_button = QPushButton("Get ARL")
         self.get_arl_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.get_arl_button.setFixedWidth(100)
