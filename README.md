@@ -12,10 +12,10 @@
 
 ## How to obtain ARL
 
-1. Go to [Deezer's website](https://www.deezer.com/).
-2. Log into your account.
-3. Open the Developer Tools by pressing **F12**.
-4. Navigate to the **Application** tab, then select **Storage** > **Cookies**.
-5. Find and copy the **ARL** value.
+1. Go to [Deezer's website](https://www.deezer.com/)
+2. Log into your account
+3. Open the Developer Tools by pressing `F12`
+4. Navigate to the **Application** tab, then select **Storage** > **Cookies**
+5. Find and copy the **ARL** value
 
 ![image](https://github.com/user-attachments/assets/936fceec-e476-410f-8975-a7875cca0de5)
