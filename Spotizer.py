@@ -336,7 +336,10 @@ class AlbumPlaylistWindow(QMainWindow):
                 owner = result.get('owner', 'Unknown')
                 self.artist_label.setText(f"<b>Owner</b>    {owner}")
             else:
-                self.artist_label.setText(f"<b>Artist</b>    {result.get('artists', 'N/A')}")
+                artists = result.get('artists', 'N/A').replace(' & ', ', ')
+                is_multiple_artists = ',' in artists
+                artist_label = 'Artists' if is_multiple_artists else 'Artist'
+                self.artist_label.setText(f"<b>{artist_label}</b>    {artists}")
             
             self.tracks_data = result.get('tracks', [])
             self.total_tracks_label.setText(f"<b>Total Tracks</b>    {len(self.tracks_data)}")
@@ -348,7 +351,9 @@ class AlbumPlaylistWindow(QMainWindow):
                 seconds = (duration % 60000) // 1000
                 duration_str = f"{minutes}:{seconds:02d}"
                 
-                self.track_list.addItem(f"{i}. {track['name']} - {track['artists']} - {duration_str}")
+                track_artists = track['artists'].replace(' & ', ', ')
+                
+                self.track_list.addItem(f"{i}. {track['name']} - {track_artists} - {duration_str}")
             
             if 'releaseDate' in result:
                 date = result['releaseDate']
@@ -521,7 +526,7 @@ class SpotizerGUI(QMainWindow):
         input_layout.setSpacing(10)
 
         url_layout = QHBoxLayout()
-        url_label = QLabel("URL:")
+        url_label = QLabel("Spotify URL:")
         url_label.setFixedWidth(100)
         
         self.url_input = QLineEdit()
@@ -703,14 +708,16 @@ class SpotizerGUI(QMainWindow):
         self.fetch_button.setEnabled(True)
         
         title = info['title']
-        artists = info['artists']
+        artists = info['artists'].replace(' & ', ', ')
         album = info['album']
         release_date = info['releaseDate']
         date_parts = release_date.split('-')
         formatted_date = f"{date_parts[2]}-{date_parts[1]}-{date_parts[0]}"
         
         self.title_label.setText(f"{title}")
-        self.artist_label.setText(f"<b>{'Artists' if ',' in artists else 'Artist'}</b>    {artists}")
+        is_multiple_artists = ',' in artists
+        artist_label = 'Artists' if is_multiple_artists else 'Artist'
+        self.artist_label.setText(f"<b>{artist_label}</b>    {artists}")
         self.album_label.setText(f"<b>Album</b>    {album}")
         self.release_date_label.setText(f"<b>Release Date</b>    {formatted_date}")
         
