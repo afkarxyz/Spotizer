@@ -6,7 +6,7 @@
 
 ## Screenshots
 
-![image](https://github.com/user-attachments/assets/484ff332-ab98-439e-a924-59638d2f9b30)
+![image](https://github.com/user-attachments/assets/9ed2d4ba-27af-4da9-86f9-8d73a82b7581)
 
 ![image](https://github.com/user-attachments/assets/3d8986eb-337a-46c4-9494-e2d74a1c6824)
 
