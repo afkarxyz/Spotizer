@@ -10,9 +10,9 @@
 
 ![image](https://github.com/user-attachments/assets/3d8986eb-337a-46c4-9494-e2d74a1c6824)
 
-![image](https://github.com/user-attachments/assets/96671472-5df3-451c-a8d7-b32540a88dd6)
+![image](https://github.com/user-attachments/assets/362d0043-f26d-4747-9e60-c2015cd74d8a)
 
-![image](https://github.com/user-attachments/assets/0d542931-6afc-42e2-b548-005718c32d94)
+![image](https://github.com/user-attachments/assets/2b7dbaf5-176c-4dc4-b064-6cc99c8538b5)
 
 ## How to obtain ARL
 
