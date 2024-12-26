@@ -395,10 +395,18 @@ class AlbumPlaylistWindow(QMainWindow):
         if not selected_items:
             self.status_label.setText("Please select at least one track")
             return
-            
+        
+        self.download_selected_button.hide()
+        self.download_all_button.hide()
+        self.close_button.hide()
+        
         self.download_tracks([self.track_list.row(item) for item in selected_items])
 
     def download_all(self):
+        self.download_selected_button.hide()
+        self.download_all_button.hide()
+        self.close_button.hide()
+        
         self.download_tracks(range(len(self.tracks_data)))
 
     def download_tracks(self, indices):
@@ -464,13 +472,22 @@ class AlbumPlaylistWindow(QMainWindow):
         QApplication.processEvents()
 
     def handle_track_complete(self, message):
-        """Handle completion of individual track download"""
         self.current_download_index += 1
+        
+        if self.current_download_index >= len(self.download_queue):
+            self.download_selected_button.show()
+            self.download_all_button.show()
+            self.close_button.show()
         
         QTimer.singleShot(100, self.download_next_track)
 
     def handle_download_error(self, error):
         self.status_label.setText(f"Download error: {error}")
+        
+        self.download_selected_button.show()
+        self.download_all_button.show()
+        self.close_button.show()
+        
         self.handle_track_complete("Error")
         
 def get_application_path():
@@ -530,7 +547,7 @@ class SpotizerGUI(QMainWindow):
         url_label.setFixedWidth(100)
         
         self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("Please enter Spotify URL")
+        self.url_input.setPlaceholderText("Please enter the Spotify URL")
         self.url_input.setClearButtonEnabled(True)
         
         self.fetch_button = QPushButton("Fetch")
