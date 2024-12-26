@@ -7,30 +7,33 @@ import json
 import requests
 import re
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QLabel, QLineEdit, 
-                            QPushButton, QProgressBar, QFileDialog,
-                            QRadioButton)
-from PyQt6.QtCore import QThread, pyqtSignal
-from PyQt6.QtCore import Qt
+                            QHBoxLayout, QLabel, QLineEdit, QPushButton, 
+                            QProgressBar, QFileDialog, QRadioButton,
+                            QListWidget)
+from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer
 from PyQt6.QtGui import QIcon, QPixmap, QCursor
 
-def get_track_metadata(track_url):
+def get_metadata(url):
     try:
-        track_id = track_url.split("/")[-1].split("?")[0]
-        
-        headers = {
-            'Host': 'api.spotifydown.com',
-            'Referer': 'https://spotifydown.com/',
-            'Origin': 'https://spotifydown.com',
-        }
-        
-        response = requests.get(
-            f"https://api.spotifydown.com/metadata/track/{track_id}",
-            headers=headers
-        )
-        
-        return response.json()
-        
+        if "/track/" in url:
+            track_id = url.split("/")[-1].split("?")[0]
+            
+            headers = {
+                'Host': 'api.spotifydown.com',
+                'Referer': 'https://spotifydown.com/',
+                'Origin': 'https://spotifydown.com',
+            }
+            
+            response = requests.get(
+                f"https://api.spotifydown.com/metadata/track/{track_id}",
+                headers=headers
+            )
+            
+            return response.json()
+        else:
+            response = requests.get(f"https://api.fabdl.com/spotify/get?url={url}")
+            return response.json()
+            
     except Exception as e:
         return None
 
@@ -71,7 +74,7 @@ class ImageDownloader(QThread):
         if image_data:
             self.finished.emit(image_data)
 
-class TrackInfoFetcher(QThread):
+class MetadataFetcher(QThread):
     finished = pyqtSignal(dict)
     error = pyqtSignal(str)
     
@@ -81,11 +84,11 @@ class TrackInfoFetcher(QThread):
         
     def run(self):
         try:
-            result = get_track_metadata(self.url)
+            result = get_metadata(self.url)
             if result:
                 self.finished.emit(result)
             else:
-                self.error.emit("Failed to fetch track information")
+                self.error.emit("Failed to fetch metadata")
         except Exception as e:
             self.error.emit(str(e))
 
@@ -110,11 +113,14 @@ class DownloaderWorker(QThread):
         else:
             formatted = f"{artists} - {title}"
             
+        formatted = self.sanitize_filename(formatted)
+        return self.output_dir, formatted
+
+    def sanitize_filename(self, filename):
         invalid_chars = '<>:"/\\|?*'
         for char in invalid_chars:
-            formatted = formatted.replace(char, '_')
-            
-        return formatted
+            filename = filename.replace(char, '_')
+        return filename
 
     def download_track(self, arl):
         try:
@@ -151,8 +157,8 @@ class DownloaderWorker(QThread):
             
             self.progress.emit(45)
 
-            filename = self.format_filename() + ".mp3"
-            output_path = os.path.join(self.output_dir, filename)
+            output_folder, filename = self.format_filename()
+            output_path = os.path.join(output_folder, filename + ".mp3")
 
             def progress_callback(current, total):
                 if total > 0:
@@ -160,9 +166,9 @@ class DownloaderWorker(QThread):
                     self.progress.emit(progress)
 
             track["download"](
-                self.output_dir,
+                output_folder,
                 quality=track_formats.MP3_128,
-                filename=filename,
+                filename=filename + ".mp3",
                 with_lyrics=False,
                 show_message=False,
                 callback=progress_callback
@@ -189,6 +195,279 @@ class DownloaderWorker(QThread):
         
         self.error.emit("All ARL codes failed. Please try different ARL codes.")
 
+class AlbumPlaylistWindow(QMainWindow):
+    def __init__(self, url, parent=None):
+        super().__init__(parent)
+        self.url = url
+        self.tracks_data = []
+        self.download_queue = []
+        self.current_download_index = 0
+        self.setWindowTitle("Album" if "/album/" in url else "Playlist")
+        self.init_ui()
+        self.fetch_metadata()
+        
+    def init_ui(self):
+        self.setFixedWidth(600)
+        self.setEnabled(True)
+        
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        self.main_layout = QVBoxLayout(central_widget)
+        self.main_layout.setContentsMargins(10, 10, 10, 10)
+
+        self.track_widget = QWidget()
+        track_layout = QHBoxLayout(self.track_widget)
+        track_layout.setContentsMargins(0, 0, 0, 0)
+        track_layout.setSpacing(10)
+
+        cover_container = QWidget()
+        cover_layout = QVBoxLayout(cover_container)
+        cover_layout.setContentsMargins(0, 0, 0, 0)
+        cover_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        self.cover_label = QLabel()
+        self.cover_label.setFixedSize(100, 100)
+        self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        cover_layout.addWidget(self.cover_label)
+        track_layout.addWidget(cover_container)
+
+        track_details_container = QWidget()
+        track_details_layout = QVBoxLayout(track_details_container)
+        track_details_layout.setContentsMargins(0, 0, 0, 0)
+        track_details_layout.setSpacing(2)
+        track_details_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        self.title_label = QLabel()
+        self.title_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.title_label.setWordWrap(True)
+        self.title_label.setMinimumWidth(400)
+        
+        self.artist_label = QLabel()
+        self.artist_label.setStyleSheet("font-size: 12px;")
+        self.artist_label.setWordWrap(True)
+        self.artist_label.setMinimumWidth(400)
+
+        self.total_tracks_label = QLabel()
+        self.total_tracks_label.setStyleSheet("font-size: 12px;")
+        self.total_tracks_label.setWordWrap(True)
+        self.total_tracks_label.setMinimumWidth(400)
+
+        self.release_date_label = QLabel()
+        self.release_date_label.setStyleSheet("font-size: 12px;")
+        self.release_date_label.setWordWrap(True)
+        self.release_date_label.setMinimumWidth(400)
+
+        track_details_layout.addWidget(self.title_label)
+        track_details_layout.addWidget(self.artist_label)
+        track_details_layout.addWidget(self.total_tracks_label)
+        track_details_layout.addWidget(self.release_date_label)
+        track_layout.addWidget(track_details_container, stretch=1)
+        track_layout.addStretch()
+
+        self.main_layout.addWidget(self.track_widget)
+
+        self.track_list = QListWidget()
+        self.track_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        self.track_list.setMinimumHeight(200)
+        self.main_layout.addWidget(self.track_list)
+
+        self.progress_container = QWidget()
+        progress_layout = QVBoxLayout(self.progress_container)
+        progress_layout.setContentsMargins(0, 10, 0, 10)
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.hide()
+        progress_layout.addWidget(self.progress_bar)
+        
+        self.main_layout.addWidget(self.progress_container)
+
+        buttons_layout = QHBoxLayout()
+        
+        button_width = 150
+        
+        self.download_selected_button = QPushButton("Download Selected")
+        self.download_selected_button.setFixedWidth(button_width)
+        self.download_selected_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.download_selected_button.clicked.connect(self.download_selected)
+        
+        self.download_all_button = QPushButton("Download All")
+        self.download_all_button.setFixedWidth(button_width)
+        self.download_all_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.download_all_button.clicked.connect(self.download_all)
+        
+        self.close_button = QPushButton("Close")
+        self.close_button.setFixedWidth(button_width)
+        self.close_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.close_button.clicked.connect(self.close)
+
+        buttons_layout.addStretch()
+        buttons_layout.addWidget(self.download_selected_button)
+        buttons_layout.addWidget(self.download_all_button)
+        buttons_layout.addWidget(self.close_button)
+        buttons_layout.addStretch()
+        
+        self.main_layout.addLayout(buttons_layout)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.hide()
+        self.main_layout.addWidget(self.progress_bar)
+
+        self.status_label = QLabel("")
+        self.main_layout.addWidget(self.status_label)
+
+    def fetch_metadata(self):
+        try:
+            response = requests.get(f"https://api.fabdl.com/spotify/get?url={self.url}")
+            data = response.json()
+            
+            if 'result' not in data:
+                self.status_label.setText("Error: Invalid response from API")
+                return
+                
+            result = data['result']
+            
+            image_url = result.get('image')
+            if image_url:
+                self.download_cover_art(image_url)
+            
+            self.title_label.setText(f"{result.get('name', 'N/A')}")
+            
+            if '/playlist/' in self.url:
+                owner = result.get('owner', 'Unknown')
+                self.artist_label.setText(f"<b>Owner</b>    {owner}")
+            else:
+                self.artist_label.setText(f"<b>Artist</b>    {result.get('artists', 'N/A')}")
+            
+            self.tracks_data = result.get('tracks', [])
+            self.total_tracks_label.setText(f"<b>Total Tracks</b>    {len(self.tracks_data)}")
+            
+            self.track_list.clear()
+            for i, track in enumerate(self.tracks_data, 1):
+                duration = track.get('duration_ms', 0)
+                minutes = duration // 60000
+                seconds = (duration % 60000) // 1000
+                duration_str = f"{minutes}:{seconds:02d}"
+                
+                self.track_list.addItem(f"{i}. {track['name']} - {track['artists']} - {duration_str}")
+            
+            if 'releaseDate' in result:
+                date = result['releaseDate']
+                date_parts = date.split('-')
+                formatted_date = f"{date_parts[2]}-{date_parts[1]}-{date_parts[0]}"
+                self.release_date_label.setText(f"<b>Release Date</b>    {formatted_date}")
+            
+        except Exception as e:
+            self.status_label.setText(f"Error fetching metadata: {str(e)}")
+
+    def download_cover_art(self, url):
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                pixmap = QPixmap()
+                pixmap.loadFromData(response.content)
+                scaled_pixmap = pixmap.scaled(100, 100, Qt.AspectRatioMode.KeepAspectRatio, 
+                                            Qt.TransformationMode.SmoothTransformation)
+                self.cover_label.setPixmap(scaled_pixmap)
+        except Exception as e:
+            print(f"Error downloading cover art: {str(e)}")
+
+    def get_track_metadata(self, track_id):
+        headers = {
+            'Host': 'api.spotifydown.com',
+            'Referer': 'https://spotifydown.com/',
+            'Origin': 'https://spotifydown.com',
+        }
+        
+        response = requests.get(
+            f"https://api.spotifydown.com/metadata/track/{track_id}",
+            headers=headers
+        )
+        
+        return response.json()
+
+    def download_selected(self):
+        selected_items = self.track_list.selectedItems()
+        if not selected_items:
+            self.status_label.setText("Please select at least one track")
+            return
+            
+        self.download_tracks([self.track_list.row(item) for item in selected_items])
+
+    def download_all(self):
+        self.download_tracks(range(len(self.tracks_data)))
+
+    def download_tracks(self, indices):
+        self.download_queue = indices
+        self.current_download_index = 0
+        self.progress_bar.show()
+        self.progress_bar.setValue(0)
+        self.status_label.setText("Starting downloads...")
+        
+        self.download_next_track()
+
+    def download_next_track(self):
+        if self.current_download_index >= len(self.download_queue):
+            self.progress_bar.hide()
+            self.status_label.setText("All downloads completed!")
+            return
+            
+        idx = self.download_queue[self.current_download_index]
+        try:
+            track_id = self.tracks_data[idx]['id']
+            track_metadata = self.get_track_metadata(track_id)
+            
+            if track_metadata:
+                base_output_dir = self.parent().dir_input.text().strip() or self.parent().default_music_dir
+                collection_name = self.title_label.text()
+                collection_folder = os.path.join(base_output_dir, self.sanitize_filename(collection_name))
+                
+                if not os.path.exists(collection_folder):
+                    os.makedirs(collection_folder)
+                
+                self.worker = DownloaderWorker(
+                    track_metadata,
+                    collection_folder,
+                    self.parent().arl_input.text().strip(),
+                    "title_artist" if self.parent().format_title_artist.isChecked() else "artist_title"
+                )
+                
+                self.worker.progress.connect(
+                    lambda p: self.update_progress(p, self.current_download_index, len(self.download_queue))
+                )
+                self.worker.error.connect(self.handle_download_error)
+                self.worker.finished.connect(self.handle_track_complete)
+                self.worker.start()
+                
+        except Exception as e:
+            self.status_label.setText(f"Error downloading track {idx + 1}: {str(e)}")
+            self.handle_track_complete("Error")
+
+    def sanitize_filename(self, filename):
+        invalid_chars = '<>:"/\\|?*'
+        for char in invalid_chars:
+            filename = filename.replace(char, '_')
+        return filename
+
+    def update_progress(self, current_progress, current_track, total_tracks):
+        track_weight = 100.0 / total_tracks
+        base_progress = (current_track * track_weight)
+        track_progress = (current_progress * track_weight) / 100.0
+        total_progress = int(base_progress + track_progress)
+        
+        self.progress_bar.setValue(total_progress)
+        self.status_label.setText(f"Downloading track {current_track + 1} of {total_tracks}...")
+        QApplication.processEvents()
+
+    def handle_track_complete(self, message):
+        """Handle completion of individual track download"""
+        self.current_download_index += 1
+        
+        QTimer.singleShot(100, self.download_next_track)
+
+    def handle_download_error(self, error):
+        self.status_label.setText(f"Download error: {error}")
+        self.handle_track_complete("Error")
+        
 def get_application_path():
     if getattr(sys, 'frozen', False):
         return sys.executable if hasattr(sys, '_MEIPASS') else os.path.dirname(sys.executable)
@@ -242,19 +521,17 @@ class SpotizerGUI(QMainWindow):
         input_layout.setSpacing(10)
 
         url_layout = QHBoxLayout()
-        url_label = QLabel("Track URL:")
+        url_label = QLabel("URL:")
         url_label.setFixedWidth(100)
         
         self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("Please enter track URL")
+        self.url_input.setPlaceholderText("Please enter Spotify URL")
         self.url_input.setClearButtonEnabled(True)
-        self.url_input.textChanged.connect(self.validate_url)
         
         self.fetch_button = QPushButton("Fetch")
         self.fetch_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.fetch_button.setFixedWidth(100)
-        self.fetch_button.setEnabled(False)
-        self.fetch_button.clicked.connect(self.fetch_track_info)
+        self.fetch_button.clicked.connect(self.fetch_metadata)
         url_layout.addWidget(url_label)
         url_layout.addWidget(self.url_input)
         url_layout.addWidget(self.fetch_button)
@@ -397,49 +674,31 @@ class SpotizerGUI(QMainWindow):
         self.status_label = QLabel("")
         self.main_layout.addWidget(self.status_label)
 
-    def validate_url(self, url):
-        url = url.strip()
-        
-        self.fetch_button.setEnabled(False)
-        
-        if not url:
-            self.status_label.clear()
-            return
-                
-        if "open.spotify.com/" not in url:
-            self.status_label.setText("Please enter a valid Spotify URL")
-            return
-                
-        if "/album/" in url:
-            self.status_label.setText("Album URLs are not supported. Please enter a track URL.")
-            return
-                
-        if "/playlist/" in url:
-            self.status_label.setText("Playlist URLs are not supported. Please enter a track URL.")
-            return
-                
-        if "/track/" not in url:
-            self.status_label.setText("Please enter a valid Spotify track URL")
-            return
-                
-        self.fetch_button.setEnabled(True)
-        self.status_label.clear()
-    
-    def fetch_track_info(self):
+    def fetch_metadata(self):
         url = self.url_input.text().strip()
         if not url:
-            self.status_label.setText("Please enter a Track URL")
+            self.status_label.setText("Please enter a URL")
+            return
+
+        if "/album/" in url or "/playlist/" in url:
+            self.album_window = AlbumPlaylistWindow(url, self)
+            self.album_window.show()
             return
 
         self.fetch_button.setEnabled(False)
         self.status_label.setText("Fetching track information...")
         
-        self.fetcher = TrackInfoFetcher(url)
+        self.fetcher = MetadataFetcher(url)
         self.fetcher.finished.connect(self.handle_track_info)
         self.fetcher.error.connect(self.handle_fetch_error)
         self.fetcher.start()
 
     def handle_track_info(self, info):
+        if 'error' in info:
+            self.status_label.setText(info['error'])
+            self.fetch_button.setEnabled(True)
+            return
+            
         self.track_info = info
         self.fetch_button.setEnabled(True)
         
