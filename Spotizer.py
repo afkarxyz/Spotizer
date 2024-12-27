@@ -3,14 +3,13 @@ import asyncio
 import aiohttp
 import os
 from pathlib import Path
-import json
 import requests
 import re
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QLineEdit, QPushButton, 
                             QProgressBar, QFileDialog, QRadioButton,
                             QListWidget)
-from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer
+from PyQt6.QtCore import QThread, pyqtSignal, Qt, QTimer, QSettings
 from PyQt6.QtGui import QIcon, QPixmap, QCursor
 
 def get_metadata(url):
@@ -96,6 +95,7 @@ class DownloaderWorker(QThread):
     progress = pyqtSignal(int)
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
+    status_update = pyqtSignal(str)
 
     def __init__(self, track_info, output_dir, arl, filename_format):
         super().__init__()
@@ -121,6 +121,9 @@ class DownloaderWorker(QThread):
         for char in invalid_chars:
             filename = filename.replace(char, '_')
         return filename
+
+    def file_exists(self, filepath):
+        return os.path.exists(filepath) and os.path.getsize(filepath) > 0
 
     def download_track(self, arl):
         try:
@@ -152,13 +155,18 @@ class DownloaderWorker(QThread):
 
             self.progress.emit(35)
 
+            output_folder, filename = self.format_filename()
+            output_path = os.path.join(output_folder, filename + ".mp3")
+
+            if self.file_exists(output_path):
+                self.status_update.emit(f"Skipping '{filename}' - File already exists")
+                self.progress.emit(100)
+                return output_path, True
+
             deezer = Deezer(arl=arl)
             track = deezer.get_track(track_id)
             
             self.progress.emit(45)
-
-            output_folder, filename = self.format_filename()
-            output_path = os.path.join(output_folder, filename + ".mp3")
 
             def progress_callback(current, total):
                 if total > 0:
@@ -175,7 +183,7 @@ class DownloaderWorker(QThread):
             )
             
             self.progress.emit(100)
-            return output_path
+            return output_path, False
 
         except Exception as e:
             raise Exception(f"An error occurred: {str(e)}")
@@ -183,17 +191,20 @@ class DownloaderWorker(QThread):
     def run(self):
         for i, arl in enumerate(self.arl_list):
             try:
-                output_path = self.download_track(arl)
-                self.finished.emit("Download Complete!")
-                return
+                result = self.download_track(arl)
+                if result:
+                    output_path, was_skipped = result
+                    if was_skipped:
+                        self.finished.emit("File already exists - Skipped!")
+                    else:
+                        self.finished.emit("Download Complete!")
+                    return
             except Exception as e:
                 if i == len(self.arl_list) - 1:
                     self.error.emit(f"All ARL codes failed. Last error: {str(e)}")
                 else:
                     print(f"ARL {i+1} failed, trying next...")
                     self.progress.emit(0)
-        
-        self.error.emit("All ARL codes failed. Please try different ARL codes.")
 
 class AlbumPlaylistWindow(QMainWindow):
     def __init__(self, url, parent=None):
@@ -449,6 +460,7 @@ class AlbumPlaylistWindow(QMainWindow):
                 )
                 self.worker.error.connect(self.handle_download_error)
                 self.worker.finished.connect(self.handle_track_complete)
+                self.worker.status_update.connect(self.status_label.setText)
                 self.worker.start()
                 
         except Exception as e:
@@ -489,27 +501,13 @@ class AlbumPlaylistWindow(QMainWindow):
         self.close_button.show()
         
         self.handle_track_complete("Error")
-        
-def get_application_path():
-    if getattr(sys, 'frozen', False):
-        return sys.executable if hasattr(sys, '_MEIPASS') else os.path.dirname(sys.executable)
-    else:
-        return os.path.abspath(__file__)
-
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    
-    return os.path.join(base_path, relative_path)
 
 class SpotizerGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Spotizer")
         
-        icon_path = resource_path("icon.svg")
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.svg")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
             
@@ -522,16 +520,21 @@ class SpotizerGUI(QMainWindow):
         
         self.track_info = None
         self.arl_codes = None
-        self.current_arl_index = 0
         
-        if getattr(sys, 'frozen', False):
-            self.cache_file = os.path.join(os.path.dirname(sys.executable), '.spotizer')
-        else:
-            self.cache_file = os.path.join(os.path.dirname(__file__), '.spotizer')
-            
+        self.settings = QSettings('Spotizer', 'Settings')
         self.init_ui()
-        self.load_cache()
-
+        self.load_settings()
+        self.setup_auto_save()
+        
+    def setup_auto_save(self):
+        self.arl_input.textChanged.connect(self.auto_save_settings)
+        self.dir_input.textChanged.connect(self.auto_save_settings)
+    
+    def auto_save_settings(self):
+        self.settings.setValue('arl', self.arl_input.text())
+        self.settings.setValue('output_dir', self.dir_input.text())
+        self.settings.sync()
+        
     def init_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -594,18 +597,12 @@ class SpotizerGUI(QMainWindow):
         self.format_artist_title = QRadioButton("Artist - Title")
         self.format_title_artist.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.format_artist_title.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.format_title_artist.setChecked(True)
+        self.format_title_artist.toggled.connect(self.on_radio_toggled)
 
         format_save_layout.addWidget(format_label)
         format_save_layout.addWidget(self.format_title_artist)
         format_save_layout.addWidget(self.format_artist_title)
         format_save_layout.addStretch()
-
-        self.save_button = QPushButton("Save")
-        self.save_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.save_button.setFixedWidth(100)
-        self.save_button.clicked.connect(self.save_settings)
-        format_save_layout.addWidget(self.save_button)
 
         input_layout.addLayout(format_save_layout)
 
@@ -683,8 +680,8 @@ class SpotizerGUI(QMainWindow):
 
         download_layout = QHBoxLayout()
         download_layout.addStretch()
-        download_layout.addWidget(self.download_button)
         download_layout.addWidget(self.open_button)
+        download_layout.addWidget(self.download_button)
         download_layout.addWidget(self.cancel_button)
         download_layout.addStretch()
         self.main_layout.addLayout(download_layout)
@@ -843,6 +840,7 @@ class SpotizerGUI(QMainWindow):
         self.worker.progress.connect(self.update_progress)
         self.worker.finished.connect(self.download_finished)
         self.worker.error.connect(self.download_error)
+        self.worker.status_update.connect(self.status_label.setText)
         self.worker.start()
 
     def update_progress(self, value):
@@ -851,9 +849,9 @@ class SpotizerGUI(QMainWindow):
     def download_finished(self, message):
         self.progress_bar.hide()
         self.status_label.setText(message)
+        self.open_button.show()
         self.download_button.setText("Clear")
         self.download_button.show()
-        self.open_button.show()
         self.cancel_button.hide()
         self.download_button.setEnabled(True)
 
@@ -866,26 +864,26 @@ class SpotizerGUI(QMainWindow):
         self.download_button.setEnabled(True)
         self.cancel_button.setEnabled(True)
 
+    def on_radio_toggled(self, checked):
+        if checked:
+            self.settings.setValue('filename_format', 'title_artist')
+        else:
+            self.settings.setValue('filename_format', 'artist_title')
+        self.settings.sync()
+
     def save_settings(self):
-        settings = {
-            'arl': self.arl_input.text(),
-            'output_dir': self.dir_input.text(),
-            'filename_format': 'title_artist' if self.format_title_artist.isChecked() else 'artist_title'
-        }
-        with open(self.cache_file, 'w') as f:
-            json.dump(settings, f)
+        self.settings.setValue('arl', self.arl_input.text())
+        self.settings.setValue('output_dir', self.dir_input.text())
+        self.settings.sync()
         self.status_label.setText("Settings saved successfully.")
 
-    def load_cache(self):
-        if os.path.exists(self.cache_file):
-            with open(self.cache_file, 'r') as f:
-                settings = json.load(f)
-            self.arl_input.setText(settings.get('arl', ''))
-            self.dir_input.setText(settings.get('output_dir', self.default_music_dir))
-            if settings.get('filename_format') == 'artist_title':
-                self.format_artist_title.setChecked(True)
-            else:
-                self.format_title_artist.setChecked(True)
+    def load_settings(self):
+        self.arl_input.setText(self.settings.value('arl', '', str))
+        self.dir_input.setText(self.settings.value('output_dir', self.default_music_dir, str))
+        
+        format_setting = self.settings.value('filename_format', 'title_artist')
+        self.format_title_artist.setChecked(format_setting == 'title_artist')
+        self.format_artist_title.setChecked(format_setting == 'artist_title')
 
 def main():
     if getattr(sys, 'frozen', False):
