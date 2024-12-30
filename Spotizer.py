@@ -4,7 +4,6 @@ import aiohttp
 import os
 from pathlib import Path
 import requests
-import re
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QLineEdit, QPushButton, 
                             QProgressBar, QFileDialog, QRadioButton,
@@ -36,19 +35,14 @@ def get_metadata(url):
     except Exception as e:
         return None
 
-def scrape_arl_codes():
-    url = "https://www.techedubyte.com/arl-aids/"
+def get_arl():
+    url = "https://spotizer.vercel.app/"
     try:
         response = requests.get(url)
-        pattern = r'<pre class="wp-block-code"><code>(.*?)</code></pre>'
-        matches = re.findall(pattern, response.text, re.DOTALL)
+        data = response.json()
         
-        result = []
-        for match in matches:
-            cleaned_text = re.sub(r'\s+', '', match)
-            result.append(cleaned_text)
-        
-        return ', '.join(result)
+        arl_codes = [value for key, value in data.items() if key.startswith('arl_')]
+        return ', '.join(arl_codes)
             
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -769,7 +763,7 @@ class SpotizerGUI(QMainWindow):
         self.get_arl_button.setEnabled(False)
         self.status_label.setText("Fetching ARL codes...")
         
-        self.arl_codes = scrape_arl_codes()
+        self.arl_codes = get_arl()
         if self.arl_codes:
             self.arl_input.setText(self.arl_codes)
             self.status_label.setText("ARL codes fetched successfully.")
