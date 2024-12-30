@@ -14,6 +14,9 @@
 
 ![image](https://github.com/user-attachments/assets/a8d5d8fa-fdb3-46f8-99ed-b24f8e0b4aad)
 
+> [!IMPORTANT]  
+> If all ARLs fail, it is recommended to use your own ARL, as these free ARLs are sometimes region-restricted.
+
 ## How to obtain ARL
 
 1. Go to [Deezer's website](https://www.deezer.com/)
