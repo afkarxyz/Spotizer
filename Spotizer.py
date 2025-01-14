@@ -684,8 +684,36 @@ class SpotizerGUI(QMainWindow):
         self.progress_bar.hide()
         self.main_layout.addWidget(self.progress_bar)
 
+        bottom_layout = QHBoxLayout()
+        
         self.status_label = QLabel("")
-        self.main_layout.addWidget(self.status_label)
+        bottom_layout.addWidget(self.status_label, stretch=1)
+        
+        self.update_button = QPushButton()
+        icon_path = os.path.join(os.path.dirname(__file__), "update.svg")
+        if os.path.exists(icon_path):
+            self.update_button.setIcon(QIcon(icon_path))
+        self.update_button.setFixedSize(16, 16)
+        self.update_button.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background: transparent;
+            }
+            QPushButton:hover {
+                background: transparent;
+            }
+        """)
+        self.update_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.update_button.setToolTip("Check for Updates")
+        self.update_button.clicked.connect(self.open_update_page)
+        
+        bottom_layout.addWidget(self.update_button)
+        
+        self.main_layout.addLayout(bottom_layout)
+        
+    def open_update_page(self):
+        import webbrowser
+        webbrowser.open('https://github.com/afkarxyz/Spotizer/releases')
 
     def fetch_metadata(self):
         url = self.url_input.text().strip()
@@ -738,6 +766,7 @@ class SpotizerGUI(QMainWindow):
         self.track_widget.show()
         self.download_button.show()
         self.cancel_button.show()
+        self.update_button.hide()
         self.status_label.clear()
 
     def update_cover_art(self, image_data):
@@ -782,6 +811,7 @@ class SpotizerGUI(QMainWindow):
         self.status_label.clear()
         self.track_info = None
         self.fetch_button.setEnabled(True)
+        self.update_button.show()
 
     def clear_form(self):
         self.url_input.clear()
@@ -795,6 +825,7 @@ class SpotizerGUI(QMainWindow):
         self.track_widget.hide()
         self.input_widget.show()
         self.track_info = None
+        self.update_button.show()
 
     def button_clicked(self):
         if self.download_button.text() == "Clear":
