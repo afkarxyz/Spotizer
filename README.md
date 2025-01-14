@@ -8,7 +8,7 @@
 
 ## Screenshots
 
-![image](https://github.com/user-attachments/assets/891d517e-3d26-496d-955e-4ff731fbb650)
+![image](https://github.com/user-attachments/assets/b7bfa524-f14f-4a33-b306-b318ef9635f0)
 
 ![image](https://github.com/user-attachments/assets/3d8986eb-337a-46c4-9494-e2d74a1c6824)
 
