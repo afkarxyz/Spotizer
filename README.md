@@ -19,12 +19,12 @@
 > [!IMPORTANT]  
 > If all ARLs fail, it is recommended to use your own ARL, as these free ARLs are sometimes region-restricted.
 
-## How to obtain ARL
+## How to Obtain ARL
 
 1. Go to [Deezer's website](https://www.deezer.com/)
 2. Log into your account
 3. Open the Developer Tools by pressing `F12`
 4. Navigate to the **Application** tab, then select **Storage** > **Cookies**
-5. Find and copy the `arl` value
+5. Find and copy the `arl` value or use the browser extension [Cookie-Editor](https://cookie-editor.com/)
 
 ![image](https://github.com/user-attachments/assets/936fceec-e476-410f-8975-a7875cca0de5)
