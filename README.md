@@ -1,25 +1,24 @@
 [![GitHub All Releases](https://img.shields.io/github/downloads/afkarxyz/Spotizer/total?style=for-the-badge)](https://github.com/afkarxyz/Spotizer/releases)
 
-![Obsolete](https://github.com/user-attachments/assets/1a9e5a82-4389-4436-bcef-757cbd53b8f2)
+![spotizer](https://github.com/user-attachments/assets/9fb51592-2ee8-4c4c-8c4a-e6b3bf49c3f9)
 
 <div align="center">
 <b>Spotizer</b> (Spotify + Deezer) is a GUI tool designed to help download Spotify tracks, albums, and playlists from Deezer by matching <b>ISRC</b> <i>(International Standard Recording Code),</i> which is highly accurate. You can get an ARL for free by pressing <code>Get ARL</code> or by entering your own ARL. Just use a free Deezer account, and that's enough.
 </div>
 
-### [Download](https://github.com/afkarxyz/Spotizer/releases/download/v1.8/Spotizer.exe)
+### [Download](https://github.com/afkarxyz/Spotizer/releases/download/v1.9/Spotizer.exe)
 
 ## Screenshots
 
-![image](https://github.com/user-attachments/assets/b7bfa524-f14f-4a33-b306-b318ef9635f0)
+![image](https://github.com/user-attachments/assets/a74881a6-7d21-4506-b208-81031c773090)
 
-![image](https://github.com/user-attachments/assets/3d8986eb-337a-46c4-9494-e2d74a1c6824)
+![image](https://github.com/user-attachments/assets/7e0db6b3-86c0-457f-8ac5-f31ac9cc3162)
 
-![image](https://github.com/user-attachments/assets/d52c329f-d236-4451-93d6-62b248620ee4)
+![image](https://github.com/user-attachments/assets/5851de99-d2c9-4c04-9a4f-53bda7c96c2b)
 
-![image](https://github.com/user-attachments/assets/a8d5d8fa-fdb3-46f8-99ed-b24f8e0b4aad)
+![image](https://github.com/user-attachments/assets/8b8ba249-a91b-4721-a017-7347a3e97fef)
 
-> [!IMPORTANT]  
-> If all ARLs fail, it is recommended to use your own ARL, as these free ARLs are sometimes region-restricted.
+![image](https://github.com/user-attachments/assets/d6e27aee-746a-4855-a47a-d0cc820c3272)
 
 ## How to Obtain ARL
 
