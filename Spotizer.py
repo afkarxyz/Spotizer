@@ -77,16 +77,20 @@ class DownloadWorker(QThread):
                     return
 
                 self.progress.emit(f"Starting download ({i+1}/{total_tracks}): {track.title} - {track.artists}", 
-                                 int((i) / total_tracks * 100))
+                                int((i) / total_tracks * 100))
                 
                 try:
                     self.download_track(track, self.outpath)
                     self.progress.emit(f"Successfully downloaded: {track.title} - {track.artists}", 
-                                     int((i + 1) / total_tracks * 100))
+                                    int((i + 1) / total_tracks * 100))
                 except Exception as e:
-                    self.failed_tracks.append((track.title, track.artists, str(e)))
-                    self.progress.emit(f"Failed to download: {track.title} - {track.artists}\nError: {str(e)}", 
-                                     int((i + 1) / total_tracks * 100))
+                    if str(e) == "File already exists":
+                        self.progress.emit(f"Skipped (File exists): {track.title} - {track.artists}", 
+                                        int((i + 1) / total_tracks * 100))
+                    else:
+                        self.failed_tracks.append((track.title, track.artists, str(e)))
+                        self.progress.emit(f"Failed to download: {track.title} - {track.artists}\nError: {str(e)}", 
+                                        int((i + 1) / total_tracks * 100))
                     continue
 
             if not self.is_stopped:
@@ -104,6 +108,17 @@ class DownloadWorker(QThread):
                 album_folder = re.sub(r'[<>:"/\\|?*]', '_', track.album)
                 outpath = os.path.join(outpath, album_folder)
                 os.makedirs(outpath, exist_ok=True)
+
+            if (self.is_album or (self.is_playlist and self.use_album_subfolders)) and self.use_track_numbers:
+                filename = f"{track.track_number:02d} - {self.get_formatted_filename(track)}"
+            else:
+                filename = self.get_formatted_filename(track)
+            
+            filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+            full_path = os.path.join(outpath, filename)
+
+            if os.path.exists(full_path):
+                raise Exception("File already exists")
 
             response = requests.get(f"https://api.deezer.com/2.0/track/isrc:{track.id}")
             track_data = response.json()
@@ -133,22 +148,16 @@ class DownloadWorker(QThread):
             
             downloaded_file = new_files.pop()
             
-            if (self.is_album or (self.is_playlist and self.use_album_subfolders)) and self.use_track_numbers:
-                new_filename = f"{track.track_number:02d} - {self.get_formatted_filename(track)}"
-            else:
-                new_filename = self.get_formatted_filename(track)
-            
-            new_filename = re.sub(r'[<>:"/\\|?*]', '_', new_filename)
-            
             old_path = os.path.join(outpath, downloaded_file)
-            new_path = os.path.join(outpath, new_filename)
             
-            if os.path.exists(new_path):
-                os.remove(new_path)
-            
-            os.rename(old_path, new_path)
+            if os.path.exists(full_path):
+                os.remove(old_path)
+            else:
+                os.rename(old_path, full_path)
             
         except Exception as e:
+            if str(e) == "File already exists":
+                raise
             raise Exception(f"Download failed: {str(e)}")
 
     def pause(self):
@@ -209,7 +218,6 @@ class SpotizerGUI(QWidget):
         self.pause_resume_btn.setText('Pause')
         self.reset_info_widget()
         self.hide_track_buttons()
-        self.reset_window_size()
 
     def initUI(self):
         self.setWindowTitle('Spotizer')
@@ -547,7 +555,7 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v1.9 | February 2025")
+        footer_label = QLabel("v2.0 | February 2025")
         footer_label.setStyleSheet("font-size: 12px; color: palette(text); margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -600,7 +608,6 @@ class SpotizerGUI(QWidget):
                 
             self.update_button_states()
             self.tab_widget.setCurrentIndex(0)
-            self.reset_window_size()
             
         except SpotifyInvalidUrlException as e:
             self.log_output.append(f'Error: {str(e)}')
@@ -925,9 +932,6 @@ class SpotizerGUI(QWidget):
     def stop_timer(self):
         self.timer.stop()
         self.time_label.hide()
-
-    def reset_window_size(self):
-        self.resize(self.width(), 400)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
