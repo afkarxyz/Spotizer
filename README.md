@@ -6,7 +6,7 @@
 <b>Spotizer</b> (Spotify + Deezer) is a GUI tool designed to help download Spotify tracks, albums, and playlists from Deezer by matching <b>ISRC</b> <i>(International Standard Recording Code),</i> which is highly accurate. Just use a <b>free Deezer account,</b> and that's enough.
 </div>
 
-### [Download](https://github.com/afkarxyz/Spotizer/releases/download/v2.0/Spotizer.exe)
+### [Download](https://github.com/afkarxyz/Spotizer/releases/download/v2.1/Spotizer.exe)
 
 ## Screenshots
 
@@ -18,7 +18,7 @@
 
 ![image](https://github.com/user-attachments/assets/8b8ba249-a91b-4721-a017-7347a3e97fef)
 
-![image](https://github.com/user-attachments/assets/d6e27aee-746a-4855-a47a-d0cc820c3272)
+![image](https://github.com/user-attachments/assets/ff3a6303-1a2c-4dde-bb00-6137ebcc6a90)
 
 ## How to Obtain ARL
 
