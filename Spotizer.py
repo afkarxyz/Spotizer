@@ -481,16 +481,16 @@ class SpotizerGUI(QWidget):
         deezer_layout = QVBoxLayout(deezer_group)
         deezer_layout.setSpacing(5)
         
-        deezer_label = QLabel('Deezer Authentication')
+        deezer_label = QLabel('Authentication')
         deezer_label.setStyleSheet("font-weight: bold; color: palette(text);")
         deezer_layout.addWidget(deezer_label)
         
         arl_layout = QHBoxLayout()
-        arl_label = QLabel('ARL Token:')
+        arl_label = QLabel('Deezer ARL:')
         arl_label.setStyleSheet("color: palette(text);")
         
         self.arl_input = QLineEdit()
-        self.arl_input.setPlaceholderText("Input your Deezer ARL token here...")
+        self.arl_input.setPlaceholderText("Input your Deezer ARL here...")
         self.arl_input.setText(self.last_arl)
         self.arl_input.textChanged.connect(self.save_arl)
         self.arl_input.setClearButtonEnabled(True)
@@ -555,7 +555,7 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v2.0 | February 2025")
+        footer_label = QLabel("v2.1 | February 2025")
         footer_label.setStyleSheet("font-size: 12px; color: palette(text); margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -808,7 +808,7 @@ class SpotizerGUI(QWidget):
             return
 
         if not self.arl_input.text().strip():
-            self.log_output.append("Error: Please enter your ARL token")
+            self.log_output.append("Error: Please enter your Deezer ARL")
             return
 
         tracks_to_download = self.tracks if self.is_single_track else [self.tracks[i] for i in indices]
