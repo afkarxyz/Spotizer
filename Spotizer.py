@@ -8,7 +8,8 @@ import re
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit,
     QLabel, QFileDialog, QListWidget, QTextEdit, QTabWidget, QButtonGroup, QRadioButton,
-    QAbstractItemView, QSpacerItem, QSizePolicy, QProgressBar, QCheckBox
+    QAbstractItemView, QSpacerItem, QSizePolicy, QProgressBar, QCheckBox, QDialog,
+    QDialogButtonBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QTimer, QTime, QSettings
 from PyQt6.QtGui import QIcon, QTextCursor, QDesktopServices, QPixmap
@@ -172,19 +173,57 @@ class DownloadWorker(QThread):
         self.is_stopped = True
         self.is_paused = False
 
+class UpdateDialog(QDialog):
+    def __init__(self, current_version, new_version, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Update Available")
+        self.setFixedWidth(400)
+        self.setModal(True)
+
+        layout = QVBoxLayout()
+
+        message = QLabel(f"A new version of Spotizer is available!\n\n"
+                        f"Current version: v{current_version}\n"
+                        f"New version: v{new_version}")
+        message.setWordWrap(True)
+        layout.addWidget(message)
+
+        self.disable_check = QCheckBox("Turn off update checking")
+        self.disable_check.setCursor(Qt.CursorShape.PointingHandCursor)
+        layout.addWidget(self.disable_check)
+
+        button_box = QDialogButtonBox()
+        self.update_button = QPushButton("Update")
+        self.update_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        button_box.addButton(self.update_button, QDialogButtonBox.ButtonRole.AcceptRole)
+        button_box.addButton(self.cancel_button, QDialogButtonBox.ButtonRole.RejectRole)
+        
+        layout.addWidget(button_box)
+
+        self.setLayout(layout)
+
+        self.update_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+        
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
+        self.current_version = "2.2" 
         self.tracks = []
         self.album_or_playlist_name = ''
         self.reset_state()
         
         self.settings = QSettings('Spotizer', 'Settings')
         self.last_output_path = self.settings.value('output_path', os.path.expanduser("~\\Music"))
+        self.last_url = self.settings.value('spotify_url', '')
         self.last_arl = self.settings.value('arl', '')
         self.filename_format = self.settings.value('filename_format', 'title_artist')
         self.use_track_numbers = self.settings.value('use_track_numbers', False, type=bool)
         self.use_album_subfolders = self.settings.value('use_album_subfolders', False, type=bool)
+        self.check_for_updates = self.settings.value('check_for_updates', True, type=bool)
         
         self.elapsed_time = QTime(0, 0, 0)
         self.timer = QTimer(self)
@@ -194,6 +233,30 @@ class SpotizerGUI(QWidget):
         self.network_manager.finished.connect(self.on_cover_loaded)
         
         self.initUI()
+        
+        if self.check_for_updates:
+            QTimer.singleShot(0, self.check_updates)
+
+    def check_updates(self):
+        try:
+            response = requests.get("https://raw.githubusercontent.com/afkarxyz/Spotizer/refs/heads/main/version.json")
+            if response.status_code == 200:
+                data = response.json()
+                new_version = data.get("version")
+                
+                if new_version and new_version != self.current_version:
+                    dialog = UpdateDialog(self.current_version, new_version, self)
+                    result = dialog.exec()
+                    
+                    if dialog.disable_check.isChecked():
+                        self.settings.setValue('check_for_updates', False)
+                        self.check_for_updates = False
+                    
+                    if result == QDialog.DialogCode.Accepted:
+                        QDesktopServices.openUrl(QUrl("https://github.com/afkarxyz/Spotizer/releases"))
+                        
+        except Exception as e:
+            print(f"Error checking for updates: {e}")
 
     @staticmethod
     def format_duration(ms):
@@ -243,6 +306,8 @@ class SpotizerGUI(QWidget):
         self.spotify_url = QLineEdit()
         self.spotify_url.setPlaceholderText("Please enter the Spotify URL")
         self.spotify_url.setClearButtonEnabled(True)
+        self.spotify_url.setText(self.last_url)
+        self.spotify_url.textChanged.connect(self.save_url)
         
         self.fetch_btn = QPushButton('Fetch')
         self.fetch_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -555,13 +620,17 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v2.1 | February 2025")
+        footer_label = QLabel("v2.2 | February 2025")
         footer_label.setStyleSheet("font-size: 12px; color: palette(text); margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         about_tab.setLayout(about_layout)
         self.tab_widget.addTab(about_tab, "About")
-
+        
+    def save_url(self):
+        self.settings.setValue('spotify_url', self.spotify_url.text().strip())
+        self.settings.sync()
+        
     def save_filename_format(self):
         self.filename_format = "artist_title" if self.artist_title_radio.isChecked() else "title_artist"
         self.settings.setValue('filename_format', self.filename_format)
