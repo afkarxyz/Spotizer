@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import requests
 import re
+from packaging import version
 
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit,
@@ -211,7 +212,7 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "2.2" 
+        self.current_version = "2.3" 
         self.tracks = []
         self.album_or_playlist_name = ''
         self.reset_state()
@@ -244,7 +245,7 @@ class SpotizerGUI(QWidget):
                 data = response.json()
                 new_version = data.get("version")
                 
-                if new_version and new_version != self.current_version:
+                if new_version and version.parse(new_version) > version.parse(self.current_version):
                     dialog = UpdateDialog(self.current_version, new_version, self)
                     result = dialog.exec()
                     
@@ -620,7 +621,7 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v2.2 | February 2025")
+        footer_label = QLabel("v2.3 | February 2025")
         footer_label.setStyleSheet("font-size: 12px; color: palette(text); margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
