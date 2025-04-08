@@ -30,6 +30,26 @@ class Track:
     track_number: int
     duration_ms: int
 
+class MetadataFetchWorker(QThread):
+    finished = pyqtSignal(dict)
+    error = pyqtSignal(str)
+    
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
+        
+    def run(self):
+        try:
+            metadata = get_filtered_data(self.url)
+            if "error" in metadata:
+                self.error.emit(metadata["error"])
+            else:
+                self.finished.emit(metadata)
+        except SpotifyInvalidUrlException as e:
+            self.error.emit(str(e))
+        except Exception as e:
+            self.error.emit(f'Failed to fetch metadata: {str(e)}')
+
 class DownloadWorker(QThread):
     finished = pyqtSignal(bool, str, list)
     progress = pyqtSignal(str, int)
@@ -212,7 +232,7 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "2.4" 
+        self.current_version = "2.5"  
         self.tracks = []
         self.album_or_playlist_name = ''
         self.reset_state()
@@ -621,7 +641,7 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v2.4 | March 2025")
+        footer_label = QLabel("v2.5 | April 2025")  
         footer_label.setStyleSheet("font-size: 12px; color: palette(text); margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -663,11 +683,20 @@ class SpotizerGUI(QWidget):
             self.reset_state()
             self.reset_ui()
             
-            metadata = get_filtered_data(url)
-            if "error" in metadata:
-                raise Exception(metadata["error"])
-                
-            url_info = parse_uri(url)
+            self.log_output.append('Just a moment. Fetching metadata...')
+            self.tab_widget.setCurrentWidget(self.process_tab)
+            
+            self.metadata_worker = MetadataFetchWorker(url)
+            self.metadata_worker.finished.connect(self.on_metadata_fetched)
+            self.metadata_worker.error.connect(self.on_metadata_error)
+            self.metadata_worker.start()
+            
+        except Exception as e:
+            self.log_output.append(f'Error: Failed to start metadata fetch: {str(e)}')
+    
+    def on_metadata_fetched(self, metadata):
+        try:
+            url_info = parse_uri(self.spotify_url.text().strip())
             
             if url_info["type"] == "track":
                 self.handle_track_metadata(metadata["track"])
@@ -678,11 +707,11 @@ class SpotizerGUI(QWidget):
                 
             self.update_button_states()
             self.tab_widget.setCurrentIndex(0)
-            
-        except SpotifyInvalidUrlException as e:
-            self.log_output.append(f'Error: {str(e)}')
         except Exception as e:
-            self.log_output.append(f'Error: Failed to fetch metadata: {str(e)}')
+            self.log_output.append(f'Error: {str(e)}')
+    
+    def on_metadata_error(self, error_message):
+        self.log_output.append(f'Error: {error_message}')
 
     def handle_track_metadata(self, track_data):
         self.tracks = [Track(
