@@ -32,7 +32,7 @@ def generate_totp(
         counter * 30_000,
     )
 
-token_url = 'https://open.spotify.com/get_access_token'
+token_url = 'https://open.spotify.com/api/token'
 playlist_base_url = 'https://api.spotify.com/v1/playlists/{}'
 album_base_url = 'https://api.spotify.com/v1/albums/{}'
 track_base_url = 'https://api.spotify.com/v1/tracks/{}'
@@ -447,8 +447,8 @@ def get_filtered_data(spotify_url, batch=False, delay=1.0):
 
 if __name__ == '__main__':
     playlist = "https://open.spotify.com/playlist/37i9dQZEVXbNG2KDcFcKOF"
-    album = "https://open.spotify.com/album/7kFyd5oyJdVX2pIi6P4iHE"
-    song = "https://open.spotify.com/track/4wJ5Qq0jBN4ajy7ouZIV1c"
+    album = "https://open.spotify.com/album/6J84szYCnMfzEcvIcfWMFL"
+    song = "https://open.spotify.com/track/7so0lgd0zP2Sbgs2d7a1SZ"
     
     filtered_playlist = get_filtered_data(playlist, batch=True, delay=0.1)
     print(json.dumps(filtered_playlist, indent=2))

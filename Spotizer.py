@@ -232,7 +232,7 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "2.6"  
+        self.current_version = "2.7"  
         self.tracks = []
         self.album_or_playlist_name = ''
         self.reset_state()
@@ -487,7 +487,7 @@ class SpotizerGUI(QWidget):
         output_layout.setSpacing(5)
         
         output_label = QLabel('Output Directory')
-        output_label.setStyleSheet("font-weight: bold; color: palette(text);")
+        output_label.setStyleSheet("font-weight: bold;")
         output_layout.addWidget(output_label)
         
         output_dir_layout = QHBoxLayout()
@@ -510,21 +510,18 @@ class SpotizerGUI(QWidget):
         file_layout.setSpacing(5)
         
         file_label = QLabel('File Settings')
-        file_label.setStyleSheet("font-weight: bold; color: palette(text);")
+        file_label.setStyleSheet("font-weight: bold;")
         file_layout.addWidget(file_label)
         
         format_layout = QHBoxLayout()
         format_label = QLabel('Filename Format:')
-        format_label.setStyleSheet("color: palette(text);")
         
         self.format_group = QButtonGroup(self)
         self.title_artist_radio = QRadioButton('Title - Artist')
-        self.title_artist_radio.setStyleSheet("color: palette(text);")
         self.title_artist_radio.setCursor(Qt.CursorShape.PointingHandCursor)
         self.title_artist_radio.toggled.connect(self.save_filename_format)
         
         self.artist_title_radio = QRadioButton('Artist - Title')
-        self.artist_title_radio.setStyleSheet("color: palette(text);")
         self.artist_title_radio.setCursor(Qt.CursorShape.PointingHandCursor)
         self.artist_title_radio.toggled.connect(self.save_filename_format)
         
@@ -545,14 +542,12 @@ class SpotizerGUI(QWidget):
         checkbox_layout = QHBoxLayout()
         
         self.track_number_checkbox = QCheckBox('Add Track Numbers to Album Files')
-        self.track_number_checkbox.setStyleSheet("color: palette(text);")
         self.track_number_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
         self.track_number_checkbox.setChecked(self.use_track_numbers)
         self.track_number_checkbox.toggled.connect(self.save_track_numbering)
         checkbox_layout.addWidget(self.track_number_checkbox)
         
         self.album_subfolder_checkbox = QCheckBox('Create Album Subfolders for Playlist Downloads')
-        self.album_subfolder_checkbox.setStyleSheet("color: palette(text);")
         self.album_subfolder_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
         self.album_subfolder_checkbox.setChecked(self.use_album_subfolders)
         self.album_subfolder_checkbox.toggled.connect(self.save_album_subfolder_setting)
@@ -568,12 +563,11 @@ class SpotizerGUI(QWidget):
         deezer_layout.setSpacing(5)
         
         deezer_label = QLabel('Authentication')
-        deezer_label.setStyleSheet("font-weight: bold; color: palette(text);")
+        deezer_label.setStyleSheet("font-weight: bold;")
         deezer_layout.addWidget(deezer_label)
         
         arl_layout = QHBoxLayout()
         arl_label = QLabel('Deezer ARL:')
-        arl_label.setStyleSheet("color: palette(text);")
         
         self.arl_input = QLineEdit()
         self.arl_input.setPlaceholderText("Input your Deezer ARL here...")
@@ -641,8 +635,8 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v2.6 | April 2025")  
-        footer_label.setStyleSheet("font-size: 12px; color: palette(text); margin-top: 10px;")
+        footer_label = QLabel("v2.7 | June 2025")  
+        footer_label.setStyleSheet("font-size: 12px; margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         about_tab.setLayout(about_layout)
