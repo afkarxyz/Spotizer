@@ -232,7 +232,7 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "2.7"  
+        self.current_version = "2.8"  
         self.tracks = []
         self.album_or_playlist_name = ''
         self.reset_state()
@@ -594,7 +594,7 @@ class SpotizerGUI(QWidget):
         sections = [
             ("Check for Updates", "https://github.com/afkarxyz/Spotizer/releases"),
             ("Report an Issue", "https://github.com/afkarxyz/Spotizer/issues"),
-            ("Deezer Site", "https://www.deezer.com/")
+            ("Deezer Site", "deezer.com")
         ]
 
         for title, url in sections:
@@ -626,7 +626,7 @@ class SpotizerGUI(QWidget):
                 }
             """)
             button.setCursor(Qt.CursorShape.PointingHandCursor)
-            button.clicked.connect(lambda _, url=url: QDesktopServices.openUrl(QUrl(url)))
+            button.clicked.connect(lambda _, url=url: QDesktopServices.openUrl(QUrl(url if url.startswith(('http://', 'https://')) else f'https://{url}')))
             section_layout.addWidget(button, alignment=Qt.AlignmentFlag.AlignCenter)
 
             about_layout.addWidget(section_widget)
@@ -635,7 +635,7 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v2.7 | June 2025")  
+        footer_label = QLabel("v2.8 | July 2025")  
         footer_label.setStyleSheet("font-size: 12px; margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
