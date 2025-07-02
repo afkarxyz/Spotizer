@@ -2,61 +2,57 @@ from time import sleep
 from urllib.parse import urlparse, parse_qs
 import requests
 import json
-import base64
-import datetime
-import hashlib
-import re
 import time
 import pyotp
+import base64
+from random import randrange
 from typing import Dict, Any, List, Tuple
 
-AUTH_TOKEN = None
-AUTH_TOKEN_EXPIRY = 0
-SECRETS = None
-SECRETS_EXPIRY = 0
+# https://github.com/visagenull/Spotify-Free
+def get_random_user_agent():
+    return f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_{randrange(11, 15)}_{randrange(4, 9)}) AppleWebKit/{randrange(530, 537)}.{randrange(30, 37)} (KHTML, like Gecko) Chrome/{randrange(80, 105)}.0.{randrange(3000, 4500)}.{randrange(60, 125)} Safari/{randrange(530, 537)}.{randrange(30, 36)}"
 
-def spotify_decode_secret(raw_secret):
-    k = [(e ^ t % 33 + 9) for t, e in enumerate(raw_secret)]
-    uint8_secret = [int(x) for x in "".join([str(x) for x in k]).encode("utf-8")]
-    bytes_secret = bytes(uint8_secret)
-    return base64.b32encode(bytes_secret).decode("ascii")
+def generate_totp():
+    secret_cipher = [37, 84, 32, 76, 87, 90, 87, 47, 13, 75, 48, 54, 44, 28, 19, 21, 22]
+    processed = [byte ^ ((i % 33) + 9) for i, byte in enumerate(secret_cipher)]
+    processed_str = "".join(map(str, processed))
+    utf8_bytes = processed_str.encode('utf-8')
+    hex_str = utf8_bytes.hex()
+    secret_bytes = bytes.fromhex(hex_str)
+    b32_secret = base64.b32encode(secret_bytes).decode('utf-8')
+    totp = pyotp.TOTP(b32_secret)
 
-def spotify_totp(decoded_secret, timestamp):
-    return pyotp.hotp.HOTP(s=decoded_secret, digits=6, digest=hashlib.sha1).at(int(timestamp / 30))
+    headers = {
+        "Host": "open.spotify.com",
+        "User-Agent": get_random_user_agent(),
+        "Accept": "*/*",
+    }
 
-def get_spotify_secrets():
-    global SECRETS, SECRETS_EXPIRY
-    if not SECRETS or SECRETS_EXPIRY < time.time():
-        response = requests.get("https://open.spotify.com", 
-                              headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"}, 
-                              timeout=10)
-        response.raise_for_status()
-        
-        match = re.search(r"\"([\w/:\-\.]*/web-player\.\w*\.js)\"", response.content.decode("utf-8"))
-        if not match:
-            raise SpotifyWebsiteParserException("Could not find assets URL")
-        
-        response = requests.get(match.group(1), timeout=10)
-        response.raise_for_status()
-        
-        match = re.search(r"\'({\"validUntil\":[^']*)\'", response.content.decode("utf-8"))
-        if not match:
-            raise SpotifyWebsiteParserException("Could not find secrets in assets")
-        
-        data = json.loads(match.group(1))
-        SECRETS = data["secrets"]
-        SECRETS_EXPIRY = datetime.datetime.fromisoformat(data["validUntil"].split(".")[0]).timestamp()
-    return SECRETS
+    try:
+        resp = requests.get("https://open.spotify.com/api/server-time", headers=headers, timeout=10)
+        if resp.status_code != 200:
+            raise Exception(f"Failed to get server time. Status code: {resp.status_code}")
+        data = resp.json()
+        server_time = data.get("serverTime")
+        if server_time is None:
+            raise Exception("Failed to fetch server time from Spotify")
+        return totp, server_time
+    except Exception as e:
+        raise Exception(f"Error getting server time: {str(e)}")
 
 token_url = 'https://open.spotify.com/api/token'
 playlist_base_url = 'https://api.spotify.com/v1/playlists/{}'
 album_base_url = 'https://api.spotify.com/v1/albums/{}'
 track_base_url = 'https://api.spotify.com/v1/tracks/{}'
 headers = {
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     'Accept': 'application/json',
     'Accept-Language': 'en-US,en;q=0.9',
     'Accept-Encoding': 'gzip, deflate, br',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
     'Referer': 'https://open.spotify.com/',
     'Origin': 'https://open.spotify.com'
 }
@@ -113,39 +109,29 @@ def get_json_from_api(api_url, access_token):
     return req.json()
 
 def get_access_token():
-    global AUTH_TOKEN, AUTH_TOKEN_EXPIRY
-    if not AUTH_TOKEN or AUTH_TOKEN_EXPIRY < time.time():
-        secrets = get_spotify_secrets()
-        decoded_secret = spotify_decode_secret(secrets[0]["secret"])
-        version = secrets[0]["version"]
-        c_time = int(time.time() * 1000)
-        totp = spotify_totp(decoded_secret, c_time / 1000)
-
+    try:
+        totp, server_time = generate_totp()
+        otp_code = totp.at(int(server_time))
+        timestamp_ms = int(time.time() * 1000)
+        
         params = {
-            "reason": "init",
-            "productType": "web-player",
-            "totp": totp,
-            "totpServer": totp,
-            "totpVer": version,
+            'reason': 'init',
+            'productType': 'web-player',
+            'totp': otp_code,
+            'totpServerTime': server_time,
+            'totpVer': '8',
+            'sTime': server_time,
+            'cTime': timestamp_ms,
+            'buildVer': 'web-player_2025-07-02_1720000000000_12345678',
+            'buildDate': '2025-07-02'
         }
         
-        req = requests.get(token_url, params=params, headers={
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9",
-            "dnt": "1",
-            "priority": "u=1, i",
-            "referer": "https://open.spotify.com/",
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-        }, timeout=10)
-        
+        req = requests.get(token_url, headers=headers, params=params, timeout=10)
         if req.status_code != 200:
             return {"error": f"Failed to get access token. Status code: {req.status_code}"}
-        
-        token_data = req.json()
-        AUTH_TOKEN = token_data.get("accessToken")
-        AUTH_TOKEN_EXPIRY = token_data.get("accessTokenExpirationTimestampMs", 0) / 1000
-        return {"accessToken": AUTH_TOKEN}
-    return {"accessToken": AUTH_TOKEN}
+        return req.json()
+    except Exception as e:
+        return {"error": f"Failed to get access token: {str(e)}"}
 
 def fetch_tracks_in_batches(url: str, access_token: str, batch_size: int = 100, delay: float = 1.0) -> Tuple[List[Dict[str, Any]], int]:
     all_tracks = []
