@@ -232,7 +232,7 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "3.0"  
+        self.current_version = "3.1"  
         self.tracks = []
         self.album_or_playlist_name = ''
         self.reset_state()
@@ -635,7 +635,7 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v3.0 | July 2025")  
+        footer_label = QLabel("v3.1 | July 2025")  
         footer_label.setStyleSheet("font-size: 12px; margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
