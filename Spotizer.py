@@ -82,6 +82,8 @@ class DownloadWorker(QThread):
     def get_formatted_filename(self, track):
         if self.filename_format == "artist_title":
             filename = f"{track.artists} - {track.title}.mp3"
+        elif self.filename_format == "title_only":
+            filename = f"{track.title}.mp3"
         else:
             filename = f"{track.title} - {track.artists}.mp3"
         return re.sub(r'[<>:"/\\|?*]', '_', filename)
@@ -232,7 +234,7 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "3.1"  
+        self.current_version = "3.2"  
         self.tracks = []
         self.album_or_playlist_name = ''
         self.reset_state()
@@ -525,17 +527,25 @@ class SpotizerGUI(QWidget):
         self.artist_title_radio.setCursor(Qt.CursorShape.PointingHandCursor)
         self.artist_title_radio.toggled.connect(self.save_filename_format)
         
+        self.title_only_radio = QRadioButton('Title')
+        self.title_only_radio.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.title_only_radio.toggled.connect(self.save_filename_format)
+        
         if hasattr(self, 'filename_format') and self.filename_format == "artist_title":
             self.artist_title_radio.setChecked(True)
+        elif hasattr(self, 'filename_format') and self.filename_format == "title_only":
+            self.title_only_radio.setChecked(True)
         else:
             self.title_artist_radio.setChecked(True)
         
         self.format_group.addButton(self.title_artist_radio)
         self.format_group.addButton(self.artist_title_radio)
+        self.format_group.addButton(self.title_only_radio)
         
         format_layout.addWidget(format_label)
         format_layout.addWidget(self.title_artist_radio)
         format_layout.addWidget(self.artist_title_radio)
+        format_layout.addWidget(self.title_only_radio)
         format_layout.addStretch()
         file_layout.addLayout(format_layout)
 
@@ -635,7 +645,7 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v3.1 | July 2025")  
+        footer_label = QLabel("v3.2 | July 2025")  
         footer_label.setStyleSheet("font-size: 12px; margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -647,7 +657,12 @@ class SpotizerGUI(QWidget):
         self.settings.sync()
         
     def save_filename_format(self):
-        self.filename_format = "artist_title" if self.artist_title_radio.isChecked() else "title_artist"
+        if self.artist_title_radio.isChecked():
+            self.filename_format = "artist_title"
+        elif self.title_only_radio.isChecked():
+            self.filename_format = "title_only"
+        else:
+            self.filename_format = "title_artist"
         self.settings.setValue('filename_format', self.filename_format)
         self.settings.sync()
         
