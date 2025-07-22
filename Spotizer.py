@@ -234,8 +234,9 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "3.2"  
+        self.current_version = "3.3"  
         self.tracks = []
+        self.all_tracks = []
         self.album_or_playlist_name = ''
         self.reset_state()
         
@@ -289,6 +290,7 @@ class SpotizerGUI(QWidget):
     
     def reset_state(self):
         self.tracks.clear()
+        self.all_tracks.clear()
         self.is_album = False
         self.is_playlist = False 
         self.is_single_track = False
@@ -304,11 +306,15 @@ class SpotizerGUI(QWidget):
         self.pause_resume_btn.setText('Pause')
         self.reset_info_widget()
         self.hide_track_buttons()
+        if hasattr(self, 'search_input'):
+            self.search_input.clear()
+        if hasattr(self, 'search_widget'):
+            self.search_widget.hide()
 
     def initUI(self):
         self.setWindowTitle('Spotizer')
         self.setFixedWidth(650)
-        self.setFixedHeight(350)
+        self.setMinimumHeight(350)
         
         icon_path = os.path.join(os.path.dirname(__file__), "icon.svg")
         if os.path.exists(icon_path):
@@ -340,6 +346,27 @@ class SpotizerGUI(QWidget):
         spotify_layout.addWidget(self.spotify_url)
         spotify_layout.addWidget(self.fetch_btn)
         self.main_layout.addLayout(spotify_layout)
+
+    def filter_tracks(self):
+        search_text = self.search_input.text().lower().strip()
+        
+        if not search_text:
+            self.tracks = self.all_tracks.copy()
+        else:
+            self.tracks = [
+                track for track in self.all_tracks
+                if (search_text in track.title.lower() or 
+                    search_text in track.artists.lower() or 
+                    search_text in track.album.lower())
+            ]
+        
+        self.update_track_list_display()
+
+    def update_track_list_display(self):
+        self.track_list.clear()
+        for i, track in enumerate(self.tracks, 1):
+            duration = self.format_duration(track.duration_ms)
+            self.track_list.addItem(f"{i}. {track.title} - {track.artists} • {duration}")
 
     def browse_output(self):
         directory = QFileDialog.getExistingDirectory(self, "Select Output Directory")
@@ -409,9 +436,36 @@ class SpotizerGUI(QWidget):
         text_info_layout.addStretch()
 
         info_layout.addLayout(text_info_layout, 1)
+        
+        self.setup_search_widget()
+        info_layout.addWidget(self.search_widget)
+        
         self.info_widget.setLayout(info_layout)
         self.info_widget.setFixedHeight(100)
         self.info_widget.hide()
+
+    def setup_search_widget(self):
+        self.search_widget = QWidget()
+        search_layout = QVBoxLayout()
+        search_layout.setContentsMargins(10, 0, 0, 0)
+        
+        search_layout.addStretch()
+        
+        search_input_layout = QHBoxLayout()
+        search_input_layout.addStretch()
+        
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search tracks...")
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.textChanged.connect(self.filter_tracks)
+        self.search_input.setFixedWidth(250)  
+        
+        
+        search_input_layout.addWidget(self.search_input)
+        search_layout.addLayout(search_input_layout)
+        
+        self.search_widget.setLayout(search_layout)
+        self.search_widget.hide()  
 
     def setup_track_buttons(self):
         self.btn_layout = QHBoxLayout()
@@ -645,7 +699,7 @@ class SpotizerGUI(QWidget):
                 spacer = QSpacerItem(20, 6, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
                 about_layout.addItem(spacer)
 
-        footer_label = QLabel("v3.2 | July 2025")  
+        footer_label = QLabel("v3.3 | July 2025")  
         footer_label.setStyleSheet("font-size: 12px; margin-top: 10px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -723,14 +777,17 @@ class SpotizerGUI(QWidget):
         self.log_output.append(f'Error: {error_message}')
 
     def handle_track_metadata(self, track_data):
-        self.tracks = [Track(
+        track = Track(
             id=track_data["isrc"],
             title=track_data["name"],
             artists=track_data["artists"],
             album=track_data["album_name"],
             track_number=1,
             duration_ms=track_data.get("duration_ms", 0)
-        )]
+        )
+        
+        self.tracks = [track]
+        self.all_tracks = [track]
         self.is_single_track = True
         self.is_album = self.is_playlist = False
         self.album_or_playlist_name = f"{self.tracks[0].title} - {self.tracks[0].artists}"
@@ -758,7 +815,8 @@ class SpotizerGUI(QWidget):
                 track_number=track["track_number"],
                 duration_ms=track.get("duration_ms", 0)
             ))
-            
+        
+        self.all_tracks = self.tracks.copy()
         self.is_album = True
         self.is_playlist = self.is_single_track = False
         
@@ -785,7 +843,8 @@ class SpotizerGUI(QWidget):
                 track_number=len(self.tracks) + 1,
                 duration_ms=track.get("duration_ms", 0)
             ))
-            
+        
+        self.all_tracks = self.tracks.copy()
         self.is_playlist = True
         self.is_album = self.is_single_track = False
         
@@ -802,10 +861,10 @@ class SpotizerGUI(QWidget):
         self.track_list.setVisible(not self.is_single_track)
         
         if not self.is_single_track:
-            self.track_list.clear()
-            for i, track in enumerate(self.tracks, 1):
-                duration = self.format_duration(track.duration_ms)
-                self.track_list.addItem(f"{i}. {track.title} - {track.artists} • {duration}")
+            self.search_widget.show()
+            self.update_track_list_display()
+        else:
+            self.search_widget.hide()
         
         self.update_info_widget(metadata)
 
