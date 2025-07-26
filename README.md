@@ -10,15 +10,13 @@
 
 ## Screenshots
 
-![image](https://github.com/user-attachments/assets/a74881a6-7d21-4506-b208-81031c773090)
+![image](https://github.com/user-attachments/assets/ac93def8-6a01-407c-a749-bdd4737754ee)
 
-![image](https://github.com/user-attachments/assets/7e0db6b3-86c0-457f-8ac5-f31ac9cc3162)
+![image](https://github.com/user-attachments/assets/b5943559-8916-4462-9b9b-7fa92d99ac1f)
 
-![image](https://github.com/user-attachments/assets/5851de99-d2c9-4c04-9a4f-53bda7c96c2b)
+![image](https://github.com/user-attachments/assets/ab429746-8426-4a36-a358-42b0398b7f68)
 
-![image](https://github.com/user-attachments/assets/8b8ba249-a91b-4721-a017-7347a3e97fef)
-
-![image](https://github.com/user-attachments/assets/93403342-b88c-48d9-90e0-8fffed6a4e57)
+![image](https://github.com/user-attachments/assets/1ea85353-f079-4ca7-8ec7-0d5241b7cea5)
 
 ## How to Obtain ARL
 
