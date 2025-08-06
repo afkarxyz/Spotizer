@@ -16,7 +16,7 @@
 
 ![image](https://github.com/user-attachments/assets/ab429746-8426-4a36-a358-42b0398b7f68)
 
-![image](https://github.com/user-attachments/assets/1ea85353-f079-4ca7-8ec7-0d5241b7cea5)
+![image](https://github.com/user-attachments/assets/b728a59b-2da0-4e11-9ca9-3f98a7092e45)
 
 ## How to Obtain ARL
 
