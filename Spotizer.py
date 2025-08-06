@@ -58,7 +58,7 @@ class DownloadWorker(QThread):
     
     def __init__(self, tracks, outpath, arl, is_single_track=False, is_album=False, is_playlist=False, 
                  album_or_playlist_name='', filename_format='title_artist', use_track_numbers=True,
-                 use_album_subfolders=False):
+                 use_album_subfolders=False, use_artist_subfolders=False):
         super().__init__()
         self.tracks = tracks
         self.outpath = outpath
@@ -70,6 +70,7 @@ class DownloadWorker(QThread):
         self.filename_format = filename_format
         self.use_track_numbers = use_track_numbers
         self.use_album_subfolders = use_album_subfolders
+        self.use_artist_subfolders = use_artist_subfolders
         self.is_paused = False
         self.is_stopped = False
         self.failed_tracks = []
@@ -131,12 +132,19 @@ class DownloadWorker(QThread):
 
     def download_track(self, track, outpath):
         try:
-            if self.is_playlist and self.use_album_subfolders:
-                album_folder = re.sub(r'[<>:"/\\|?*]', '_', track.album)
-                outpath = os.path.join(outpath, album_folder)
+            if self.is_playlist:
+                if self.use_artist_subfolders:
+                    artist_name = track.artists.split(', ')[0] if ', ' in track.artists else track.artists
+                    artist_folder = re.sub(r'[<>:"/\\|?*]', lambda m: "'" if m.group() == '"' else '_', artist_name)
+                    outpath = os.path.join(outpath, artist_folder)
+                
+                if self.use_album_subfolders:
+                    album_folder = re.sub(r'[<>:"/\\|?*]', lambda m: "'" if m.group() == '"' else '_', track.album)
+                    outpath = os.path.join(outpath, album_folder)
+                
                 os.makedirs(outpath, exist_ok=True)
 
-            if (self.is_album or (self.is_playlist and self.use_album_subfolders)) and self.use_track_numbers:
+            if (self.is_album or (self.is_playlist and (self.use_artist_subfolders or self.use_album_subfolders))) and self.use_track_numbers:
                 filename = f"{track.track_number:02d} - {self.get_formatted_filename(track)}"
             else:
                 filename = self.get_formatted_filename(track)
@@ -231,7 +239,7 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "3.4"  
+        self.current_version = "3.5"  
         self.tracks = []
         self.all_tracks = []
         self.album_or_playlist_name = ''
@@ -244,6 +252,7 @@ class SpotizerGUI(QWidget):
         self.filename_format = self.settings.value('filename_format', 'title_artist')
         self.use_track_numbers = self.settings.value('use_track_numbers', False, type=bool)
         self.use_album_subfolders = self.settings.value('use_album_subfolders', False, type=bool)
+        self.use_artist_subfolders = self.settings.value('use_artist_subfolders', False, type=bool)
         self.check_for_updates = self.settings.value('check_for_updates', True, type=bool)
         self.current_theme_color = self.settings.value('theme_color', '#2196F3')
         
@@ -630,17 +639,23 @@ class SpotizerGUI(QWidget):
 
         checkbox_layout = QHBoxLayout()
         
-        self.track_number_checkbox = QCheckBox('Add Track Numbers to Album Files')
-        self.track_number_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.track_number_checkbox.setChecked(self.use_track_numbers)
-        self.track_number_checkbox.toggled.connect(self.save_track_numbering)
-        checkbox_layout.addWidget(self.track_number_checkbox)
+        self.artist_subfolder_checkbox = QCheckBox('Artist Subfolder (Playlist)')
+        self.artist_subfolder_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.artist_subfolder_checkbox.setChecked(self.use_artist_subfolders)
+        self.artist_subfolder_checkbox.toggled.connect(self.save_artist_subfolder_setting)
+        checkbox_layout.addWidget(self.artist_subfolder_checkbox)
         
-        self.album_subfolder_checkbox = QCheckBox('Create Album Subfolders for Playlist Downloads')
+        self.album_subfolder_checkbox = QCheckBox('Album Subfolder (Playlist)')
         self.album_subfolder_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
         self.album_subfolder_checkbox.setChecked(self.use_album_subfolders)
         self.album_subfolder_checkbox.toggled.connect(self.save_album_subfolder_setting)
         checkbox_layout.addWidget(self.album_subfolder_checkbox)
+        
+        self.track_number_checkbox = QCheckBox('Track Number for Album')
+        self.track_number_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.track_number_checkbox.setChecked(self.use_track_numbers)
+        self.track_number_checkbox.toggled.connect(self.save_track_numbering)
+        checkbox_layout.addWidget(self.track_number_checkbox)
         
         checkbox_layout.addStretch()
         file_layout.addLayout(checkbox_layout)
@@ -876,7 +891,7 @@ class SpotizerGUI(QWidget):
 
             about_layout.addWidget(section_widget)
 
-        footer_label = QLabel(f"v{self.current_version} | July 2025")
+        footer_label = QLabel(f"v{self.current_version} | August 2025")
         footer_label.setStyleSheet("font-size: 12px; margin-top: 20px;")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -907,6 +922,11 @@ class SpotizerGUI(QWidget):
         self.settings.setValue('use_album_subfolders', self.use_album_subfolders)
         self.settings.sync()
     
+    def save_artist_subfolder_setting(self):
+        self.use_artist_subfolders = self.artist_subfolder_checkbox.isChecked()
+        self.settings.setValue('use_artist_subfolders', self.use_artist_subfolders)
+        self.settings.sync()
+
     def save_arl(self):
         self.settings.setValue('arl', self.arl_input.text().strip())
         self.settings.setValue('output_path', self.output_dir.text().strip())
@@ -1198,7 +1218,8 @@ class SpotizerGUI(QWidget):
             self.album_or_playlist_name,
             self.filename_format,
             self.use_track_numbers,
-            self.use_album_subfolders
+            self.use_album_subfolders,
+            self.use_artist_subfolders
         )
         self.worker.finished.connect(self.on_download_finished)
         self.worker.progress.connect(self.update_progress)
