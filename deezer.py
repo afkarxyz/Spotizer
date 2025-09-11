@@ -2,8 +2,12 @@ import sys
 import re
 import json
 from typing import Optional, Sequence
+from random import randrange
 
 from configuration import config
+
+def get_random_user_agent():
+    return f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_{randrange(11, 15)}_{randrange(4, 9)}) AppleWebKit/{randrange(530, 537)}.{randrange(30, 37)} (KHTML, like Gecko) Chrome/{randrange(80, 105)}.0.{randrange(3000, 4500)}.{randrange(60, 125)} Safari/{randrange(530, 537)}.{randrange(30, 36)}"
 
 from Crypto.Hash import MD5
 from Crypto.Cipher import AES, Blowfish
@@ -48,7 +52,7 @@ def init_deezer_session(proxy_server):
         'Origin': 'https://www.deezer.com',
         'Accept-Encoding': 'gzip, deflate, br',
         'Accept-Language': 'en-US,en;q=0.9',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36',
+        'User-Agent': get_random_user_agent(),
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         'Accept': '*/*',
         'Cache-Control': 'no-cache',

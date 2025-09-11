@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit,
     QLabel, QFileDialog, QListWidget, QTextEdit, QTabWidget, QButtonGroup, QRadioButton,
     QAbstractItemView, QProgressBar, QCheckBox, QDialog,
-    QDialogButtonBox
+    QDialogButtonBox, QComboBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QTimer, QTime, QSettings
 from PyQt6.QtGui import QIcon, QTextCursor, QDesktopServices, QPixmap
@@ -31,6 +31,7 @@ class Track:
     album: str
     track_number: int
     duration_ms: int
+    release_date: str = ""
 
 class MetadataFetchWorker(QThread):
     finished = pyqtSignal(dict)
@@ -239,7 +240,7 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "3.5"  
+        self.current_version = "3.6"  
         self.tracks = []
         self.all_tracks = []
         self.album_or_playlist_name = ''
@@ -255,6 +256,8 @@ class SpotizerGUI(QWidget):
         self.use_artist_subfolders = self.settings.value('use_artist_subfolders', False, type=bool)
         self.check_for_updates = self.settings.value('check_for_updates', True, type=bool)
         self.current_theme_color = self.settings.value('theme_color', '#2196F3')
+        self.track_list_format = self.settings.value('track_list_format', 'track_artist_date_duration')
+        self.date_format = self.settings.value('date_format', 'dd_mm_yyyy')
         
         self.elapsed_time = QTime(0, 0, 0)
         self.timer = QTimer(self)
@@ -366,11 +369,74 @@ class SpotizerGUI(QWidget):
         
         self.update_track_list_display()
 
+    def format_track_date(self, release_date):
+        if not release_date:
+            return ""
+        
+        try:
+            if len(release_date) == 4:
+                date_obj = datetime.strptime(release_date, "%Y")
+                if self.date_format == "yyyy":
+                    return date_obj.strftime('%Y')
+                else:
+                    return date_obj.strftime('%Y')
+            elif len(release_date) == 7:
+                date_obj = datetime.strptime(release_date, "%Y-%m")
+                if self.date_format == "dd_mm_yyyy":
+                    return date_obj.strftime('%m-%Y')
+                elif self.date_format == "yyyy_mm_dd":
+                    return date_obj.strftime('%Y-%m')
+                else:
+                    return date_obj.strftime('%Y')
+            else:
+                date_obj = datetime.strptime(release_date, "%Y-%m-%d")
+                if self.date_format == "dd_mm_yyyy":
+                    return date_obj.strftime('%d-%m-%Y')
+                elif self.date_format == "yyyy_mm_dd":
+                    return date_obj.strftime('%Y-%m-%d')
+                else:
+                    return date_obj.strftime('%Y')
+        except ValueError:
+            return release_date
+
     def update_track_list_display(self):
         self.track_list.clear()
         for i, track in enumerate(self.tracks, 1):
             duration = self.format_duration(track.duration_ms)
-            self.track_list.addItem(f"{i}. {track.title} - {track.artists} • {duration}")
+            formatted_date = self.format_track_date(track.release_date)
+            
+            if self.track_list_format == "artist_track_date_duration":
+                display_parts = [f"{i}. {track.artists} - {track.title}"]
+                if formatted_date:
+                    display_parts.append(formatted_date)
+                display_parts.append(duration)
+                display_text = " • ".join(display_parts)
+            elif self.track_list_format == "track_artist_date":
+                display_parts = [f"{i}. {track.title} - {track.artists}"]
+                if formatted_date:
+                    display_parts.append(formatted_date)
+                display_text = " • ".join(display_parts)
+            elif self.track_list_format == "artist_track_date":
+                display_parts = [f"{i}. {track.artists} - {track.title}"]
+                if formatted_date:
+                    display_parts.append(formatted_date)
+                display_text = " • ".join(display_parts)
+            elif self.track_list_format == "track_artist_duration":
+                display_text = f"{i}. {track.title} - {track.artists} • {duration}"
+            elif self.track_list_format == "artist_track_duration":
+                display_text = f"{i}. {track.artists} - {track.title} • {duration}"
+            elif self.track_list_format == "track_artist":
+                display_text = f"{i}. {track.title} - {track.artists}"
+            elif self.track_list_format == "artist_track":
+                display_text = f"{i}. {track.artists} - {track.title}"
+            else:
+                display_parts = [f"{i}. {track.title} - {track.artists}"]
+                if formatted_date:
+                    display_parts.append(formatted_date)
+                display_parts.append(duration)
+                display_text = " • ".join(display_parts)
+            
+            self.track_list.addItem(display_text)
 
     def browse_output(self):
         directory = QFileDialog.getExistingDirectory(self, "Select Output Directory")
@@ -568,15 +634,16 @@ class SpotizerGUI(QWidget):
     def setup_settings_tab(self):
         settings_tab = QWidget()
         settings_layout = QVBoxLayout()
-        settings_layout.setSpacing(10)
-        settings_layout.setContentsMargins(9, 9, 9, 9)
+        settings_layout.setSpacing(4)
+        settings_layout.setContentsMargins(10, 10, 10, 10)
 
         output_group = QWidget()
         output_layout = QVBoxLayout(output_group)
-        output_layout.setSpacing(5)
+        output_layout.setSpacing(2)
+        output_layout.setContentsMargins(0, 0, 0, 0)
         
         output_label = QLabel('Output Directory')
-        output_label.setStyleSheet("font-weight: bold;")
+        output_label.setStyleSheet("font-weight: bold; margin-top: 0px; margin-bottom: 5px;")
         output_layout.addWidget(output_label)
         
         output_dir_layout = QHBoxLayout()
@@ -590,17 +657,66 @@ class SpotizerGUI(QWidget):
         self.output_browse.clicked.connect(self.browse_output)
         
         output_dir_layout.addWidget(self.output_dir)
+        output_dir_layout.addSpacing(5)
         output_dir_layout.addWidget(self.output_browse)
         output_layout.addLayout(output_dir_layout)
         
         settings_layout.addWidget(output_group)
 
+        dashboard_group = QWidget()
+        dashboard_layout = QVBoxLayout(dashboard_group)
+        dashboard_layout.setSpacing(3)
+        dashboard_layout.setContentsMargins(0, 0, 0, 0)
+        
+        dashboard_label = QLabel('Dashboard Settings')
+        dashboard_label.setStyleSheet("font-weight: bold; margin-top: 8px; margin-bottom: 5px;")
+        dashboard_layout.addWidget(dashboard_label)
+        
+        dashboard_controls_layout = QHBoxLayout()
+        
+        list_format_label = QLabel('Track List View:')
+        list_format_label.setFixedWidth(90)
+        
+        self.track_list_format_dropdown = QComboBox()
+        self.track_list_format_dropdown.addItem("Track - Artist - Date - Duration", "track_artist_date_duration")
+        self.track_list_format_dropdown.addItem("Artist - Track - Date - Duration", "artist_track_date_duration")
+        self.track_list_format_dropdown.addItem("Track - Artist - Date", "track_artist_date")
+        self.track_list_format_dropdown.addItem("Artist - Track - Date", "artist_track_date")
+        self.track_list_format_dropdown.addItem("Track - Artist - Duration", "track_artist_duration")
+        self.track_list_format_dropdown.addItem("Artist - Track - Duration", "artist_track_duration")
+        self.track_list_format_dropdown.addItem("Track - Artist", "track_artist")
+        self.track_list_format_dropdown.addItem("Artist - Track", "artist_track")
+        self.track_list_format_dropdown.currentIndexChanged.connect(self.save_track_list_format)
+        
+        dashboard_controls_layout.addWidget(list_format_label)
+        dashboard_controls_layout.addWidget(self.track_list_format_dropdown)
+        
+        dashboard_controls_layout.addSpacing(15)
+        
+        date_format_label = QLabel('Date Format:')
+        date_format_label.setFixedWidth(80)
+        
+        self.date_format_dropdown = QComboBox()
+        self.date_format_dropdown.addItem("DD-MM-YYYY", "dd_mm_yyyy")
+        self.date_format_dropdown.addItem("YYYY-MM-DD", "yyyy_mm_dd")
+        self.date_format_dropdown.addItem("YYYY", "yyyy")
+        self.date_format_dropdown.currentIndexChanged.connect(self.save_date_format)
+        
+        dashboard_controls_layout.addWidget(date_format_label)
+        dashboard_controls_layout.addWidget(self.date_format_dropdown)
+        dashboard_controls_layout.addStretch()
+        
+        dashboard_layout.addLayout(dashboard_controls_layout)
+        
+        settings_layout.addWidget(dashboard_group)
+
         file_group = QWidget()
         file_layout = QVBoxLayout(file_group)
-        file_layout.setSpacing(5)
+        file_layout.setSpacing(2)
+        file_layout.setContentsMargins(0, 0, 0, 0)
         
         file_label = QLabel('File Settings')
-        file_label.setStyleSheet("font-weight: bold;")
+        file_label.setStyleSheet("font-weight: bold; margin-top: 8px; margin-bottom: 5px;")
         file_layout.addWidget(file_label)
         
         format_layout = QHBoxLayout()
@@ -632,7 +748,9 @@ class SpotizerGUI(QWidget):
         
         format_layout.addWidget(format_label)
         format_layout.addWidget(self.title_artist_radio)
+        format_layout.addSpacing(10)
         format_layout.addWidget(self.artist_title_radio)
+        format_layout.addSpacing(10)
         format_layout.addWidget(self.title_only_radio)
         format_layout.addStretch()
         file_layout.addLayout(format_layout)
@@ -644,14 +762,16 @@ class SpotizerGUI(QWidget):
         self.artist_subfolder_checkbox.setChecked(self.use_artist_subfolders)
         self.artist_subfolder_checkbox.toggled.connect(self.save_artist_subfolder_setting)
         checkbox_layout.addWidget(self.artist_subfolder_checkbox)
+        checkbox_layout.addSpacing(10)
         
         self.album_subfolder_checkbox = QCheckBox('Album Subfolder (Playlist)')
         self.album_subfolder_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
         self.album_subfolder_checkbox.setChecked(self.use_album_subfolders)
         self.album_subfolder_checkbox.toggled.connect(self.save_album_subfolder_setting)
         checkbox_layout.addWidget(self.album_subfolder_checkbox)
+        checkbox_layout.addSpacing(10)
         
-        self.track_number_checkbox = QCheckBox('Track Number for Album')
+        self.track_number_checkbox = QCheckBox('Track Number')
         self.track_number_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
         self.track_number_checkbox.setChecked(self.use_track_numbers)
         self.track_number_checkbox.toggled.connect(self.save_track_numbering)
@@ -664,10 +784,11 @@ class SpotizerGUI(QWidget):
 
         deezer_group = QWidget()
         deezer_layout = QVBoxLayout(deezer_group)
-        deezer_layout.setSpacing(5)
+        deezer_layout.setSpacing(2)
+        deezer_layout.setContentsMargins(0, 0, 0, 0)
         
         deezer_label = QLabel('Authentication')
-        deezer_label.setStyleSheet("font-weight: bold;")
+        deezer_label.setStyleSheet("font-weight: bold; margin-top: 8px; margin-bottom: 5px;")
         deezer_layout.addWidget(deezer_label)
         
         arl_layout = QHBoxLayout()
@@ -689,11 +810,14 @@ class SpotizerGUI(QWidget):
         settings_tab.setLayout(settings_layout)
         self.tab_widget.addTab(settings_tab, "Settings")
         
+        self.set_combobox_value(self.track_list_format_dropdown, self.track_list_format)
+        self.set_combobox_value(self.date_format_dropdown, self.date_format)
+        
     def setup_theme_tab(self):
         theme_tab = QWidget()
         theme_layout = QVBoxLayout()
         theme_layout.setSpacing(8)
-        theme_layout.setContentsMargins(15, 15, 15, 15)
+        theme_layout.setContentsMargins(8, 15, 15, 15)
 
         grid_layout = QVBoxLayout()
         
@@ -891,8 +1015,7 @@ class SpotizerGUI(QWidget):
 
             about_layout.addWidget(section_widget)
 
-        footer_label = QLabel(f"v{self.current_version} | August 2025")
-        footer_label.setStyleSheet("font-size: 12px; margin-top: 20px;")
+        footer_label = QLabel(f"v{self.current_version} | September 2025")
         about_layout.addWidget(footer_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         about_tab.setLayout(about_layout)
@@ -931,6 +1054,32 @@ class SpotizerGUI(QWidget):
         self.settings.setValue('arl', self.arl_input.text().strip())
         self.settings.setValue('output_path', self.output_dir.text().strip())
         self.log_output.append("Settings saved successfully!")
+    
+    def save_track_list_format(self):
+        format_value = self.track_list_format_dropdown.currentData()
+        self.track_list_format = format_value
+        self.settings.setValue('track_list_format', format_value)
+        self.settings.sync()
+        if self.tracks:
+            self.update_track_list_display()
+    
+    def save_date_format(self):
+        format_value = self.date_format_dropdown.currentData()
+        self.date_format = format_value
+        self.settings.setValue('date_format', format_value)
+        self.settings.sync()
+        if self.tracks:
+            self.update_track_list_display()
+
+    def set_combobox_value(self, combobox, target_value):
+        for i in range(combobox.count()):
+            if combobox.itemData(i, Qt.ItemDataRole.UserRole + 1) == target_value:
+                combobox.setCurrentIndex(i)
+                return True
+            if combobox.itemData(i, Qt.ItemDataRole.UserRole) == target_value:
+                combobox.setCurrentIndex(i)
+                return True
+        return False
         
     def fetch_tracks(self):
         url = self.spotify_url.text().strip()
@@ -980,7 +1129,8 @@ class SpotizerGUI(QWidget):
             artists=track_data["artists"],
             album=track_data["album_name"],
             track_number=1,
-            duration_ms=track_data.get("duration_ms", 0)
+            duration_ms=track_data.get("duration_ms", 0),
+            release_date=track_data.get("release_date", "")
         )
         
         self.tracks = [track]
@@ -1010,7 +1160,8 @@ class SpotizerGUI(QWidget):
                 artists=track["artists"],
                 album=self.album_or_playlist_name,
                 track_number=track["track_number"],
-                duration_ms=track.get("duration_ms", 0)
+                duration_ms=track.get("duration_ms", 0),
+                release_date=track.get("release_date", "")
             ))
         
         self.all_tracks = self.tracks.copy()
@@ -1038,7 +1189,8 @@ class SpotizerGUI(QWidget):
                 artists=track["artists"],
                 album=track["album_name"],
                 track_number=len(self.tracks) + 1,
-                duration_ms=track.get("duration_ms", 0)
+                duration_ms=track.get("duration_ms", 0),
+                release_date=track.get("release_date", "")
             ))
         
         self.all_tracks = self.tracks.copy()
@@ -1301,8 +1453,6 @@ class SpotizerGUI(QWidget):
                 self.tracks.pop(index)
             
             for i, track in enumerate(self.tracks, 1):
-                if self.is_playlist:
-                    track.track_number = i
                 
                 duration = self.format_duration(track.duration_ms)
                 display_text = f"{i}. {track.title} - {track.artists} • {duration}"
