@@ -240,7 +240,7 @@ class UpdateDialog(QDialog):
 class SpotizerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.current_version = "3.6"  
+        self.current_version = "3.7"  
         self.tracks = []
         self.all_tracks = []
         self.album_or_playlist_name = ''
@@ -1113,6 +1113,10 @@ class SpotizerGUI(QWidget):
                 self.handle_album_metadata(metadata)
             elif url_info["type"] == "playlist":
                 self.handle_playlist_metadata(metadata)
+            elif url_info["type"] == "artist_discography":
+                self.handle_discography_metadata(metadata)
+            elif url_info["type"] == "artist":
+                self.handle_artist_metadata(metadata)
                 
             self.update_button_states()
             self.tab_widget.setCurrentIndex(0)
@@ -1206,6 +1210,50 @@ class SpotizerGUI(QWidget):
         }
         self.update_display_after_fetch(metadata)
 
+    def handle_discography_metadata(self, discography_data):
+        artist_info = discography_data["artist_info"]
+        self.album_or_playlist_name = f"{artist_info['name']} - Discography ({artist_info['discography_type'].title()})"
+        self.tracks = []
+        
+        for track in discography_data["track_list"]:
+            track_id = track.get("isrc", "")
+            self.tracks.append(Track(
+                id=track_id,
+                title=track["name"],
+                artists=track["artists"],
+                album=track["album_name"],
+                track_number=track.get("track_number", len(self.tracks) + 1),
+                duration_ms=track.get("duration_ms", 0),
+                release_date=track.get("release_date", "")
+            ))
+        
+        self.all_tracks = self.tracks.copy()
+        self.is_playlist = True
+        self.is_album = self.is_single_track = False
+        
+        metadata = {
+            'title': f"{artist_info['name']} - Discography",
+            'artists': f"{artist_info['discography_type'].title()} • {artist_info['total_albums']} albums",
+            'cover': artist_info["images"],
+            'followers': artist_info.get("followers", 0),
+            'total_tracks': len(self.tracks),
+            'discography_type': artist_info['discography_type']
+        }
+        self.update_display_after_fetch(metadata)
+
+    def handle_artist_metadata(self, artist_data):
+        self.reset_state()
+        
+        metadata = {
+            'title': artist_data["artist"]["name"],
+            'artists': f"Followers: {artist_data['artist']['followers']:,}",
+            'cover': artist_data["artist"]["images"],
+            'followers': artist_data["artist"]["followers"],
+            'genres': artist_data["artist"].get("genres", [])
+        }
+        
+        self.update_info_widget_artist_only(metadata)
+
     def update_display_after_fetch(self, metadata):
         self.track_list.setVisible(not self.is_single_track)
         
@@ -1261,9 +1309,37 @@ class SpotizerGUI(QWidget):
             self.type_label.setText(f"<b>Album</b> • {total_tracks} tracks")
         elif self.is_playlist:
             total_tracks = metadata.get('total_tracks', 0)
-            self.type_label.setText(f"<b>Playlist</b> • {total_tracks} tracks")
+            if metadata.get('discography_type'):
+                discography_type = metadata['discography_type'].title()
+                self.type_label.setText(f"<b>Discography ({discography_type})</b> • {total_tracks} tracks")
+            else:
+                self.type_label.setText(f"<b>Playlist</b> • {total_tracks} tracks")
         
         self.network_manager.get(QNetworkRequest(QUrl(metadata['cover'])))
+        
+        self.info_widget.show()
+
+    def update_info_widget_artist_only(self, metadata):
+        self.title_label.setText(metadata['title'])
+        self.artists_label.setText(f"<b>Followers</b> {metadata['followers']:,}")
+        
+        if metadata.get('genres'):
+            genres_text = ", ".join(metadata['genres'][:3])
+            if len(metadata['genres']) > 3:
+                genres_text += f" (+{len(metadata['genres']) - 3} more)"
+            self.followers_label.setText(f"<b>Genres</b> {genres_text}")
+            self.followers_label.show()
+        else:
+            self.followers_label.hide()
+        
+        self.release_date_label.hide()
+        self.type_label.setText("<b>Artist Profile</b> • No tracks available for download")
+        
+        self.network_manager.get(QNetworkRequest(QUrl(metadata['cover'])))
+        
+        self.track_list.hide()
+        self.search_widget.hide()
+        self.hide_track_buttons()
         
         self.info_widget.show()
 
